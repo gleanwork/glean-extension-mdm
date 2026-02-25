@@ -4,7 +4,7 @@ import * as os from "os";
 import * as vscode from "vscode";
 import type { GleanMcpConfig } from "./types";
 
-const DEFAULT_SERVER_NAME = "glean";
+const DEFAULT_SERVER_NAME = "glean_default";
 
 /**
  * Platform-specific paths where MDM drops the config file.
@@ -13,15 +13,15 @@ const DEFAULT_SERVER_NAME = "glean";
 function getSystemConfigPath(): string {
   switch (process.platform) {
     case "darwin":
-      return "/Library/Application Support/Glean/mcp-config.json";
+      return "/Library/Application Support/Glean MDM/mcp-config.json";
     case "win32":
       return path.join(
         process.env.PROGRAMDATA ?? "C:\\ProgramData",
-        "Glean",
+        "Glean MDM",
         "mcp-config.json"
       );
     default:
-      return "/etc/glean/mcp-config.json";
+      return "/etc/glean_mdm/mcp-config.json";
   }
 }
 
@@ -29,7 +29,7 @@ function getSystemConfigPath(): string {
  * User-level config path (for non-MDM / dev scenarios).
  */
 function getUserConfigPath(): string {
-  return path.join(os.homedir(), ".glean", "mcp-config.json");
+  return path.join(os.homedir(), ".glean_mdm", "mcp-config.json");
 }
 
 function readJsonFile(filePath: string): Record<string, unknown> | null {
