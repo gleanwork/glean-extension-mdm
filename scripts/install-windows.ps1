@@ -16,8 +16,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$VsixPath = Join-Path $ScriptDir "glean-mcp.vsix"
+$VsixDownloadUrl = "https://example.com/path/to/glean-mcp.vsix"
+$VsixPath = Join-Path $env:TEMP "glean-mcp.vsix"
 $ConfigDir = Join-Path $env:ProgramData "Glean"
 $ConfigPath = Join-Path $ConfigDir "mcp-config.json"
 
@@ -34,17 +34,20 @@ $config = @{
 Set-Content -Path $ConfigPath -Value $config -Encoding UTF8
 Write-Host "Config written to $ConfigPath"
 
-# Install extension if Cursor CLI is available and .vsix exists
-if (-not (Test-Path $VsixPath)) {
-    Write-Warning "$VsixPath not found. Skipping extension install."
+# Download and install extension if Cursor CLI is available
+$cursorCmd = Get-Command cursor -ErrorAction SilentlyContinue
+if (-not $cursorCmd) {
+    Write-Warning "'cursor' CLI not found. Skipping extension install."
     exit 0
 }
 
-$cursorCmd = Get-Command cursor -ErrorAction SilentlyContinue
-if ($cursorCmd) {
+Write-Host "Downloading extension from $VsixDownloadUrl..."
+try {
+    Invoke-WebRequest -Uri $VsixDownloadUrl -OutFile $VsixPath -UseBasicParsing
     & cursor --install-extension $VsixPath
+    Remove-Item -Path $VsixPath -Force -ErrorAction SilentlyContinue
     Write-Host "Extension installed successfully."
-} else {
-    Write-Warning "'cursor' CLI not found. Skipping extension install."
-    Write-Host "The extension can be installed manually: cursor --install-extension $VsixPath"
+} catch {
+    Write-Error "Failed to download extension from ${VsixDownloadUrl}: $_"
+    exit 1
 }

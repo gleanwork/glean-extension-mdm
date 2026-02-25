@@ -6,12 +6,11 @@
 # Usage: install-linux.sh <glean_mcp_url> [server_name]
 #
 # This script is intended to be run as root.
-# The .vsix file should be placed alongside this script.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VSIX_PATH="${SCRIPT_DIR}/glean-mcp.vsix"
+VSIX_DOWNLOAD_URL="https://example.com/path/to/glean-mcp.vsix"
+VSIX_PATH="/tmp/glean-mcp.vsix"
 CONFIG_DIR="/etc/glean"
 CONFIG_PATH="${CONFIG_DIR}/mcp-config.json"
 
@@ -35,16 +34,18 @@ EOF
 chmod 644 "$CONFIG_PATH"
 echo "Config written to ${CONFIG_PATH}"
 
-# Install extension if Cursor CLI is available and .vsix exists
-if [ ! -f "$VSIX_PATH" ]; then
-  echo "Warning: ${VSIX_PATH} not found. Skipping extension install."
+# Download and install extension if Cursor CLI is available
+if ! command -v cursor &> /dev/null; then
+  echo "Warning: 'cursor' CLI not found. Skipping extension install."
   exit 0
 fi
 
-if command -v cursor &> /dev/null; then
+echo "Downloading extension from ${VSIX_DOWNLOAD_URL}..."
+if curl -fsSL -o "$VSIX_PATH" "$VSIX_DOWNLOAD_URL"; then
   cursor --install-extension "$VSIX_PATH"
+  rm -f "$VSIX_PATH"
   echo "Extension installed successfully."
 else
-  echo "Warning: 'cursor' CLI not found. Skipping extension install."
-  echo "The extension can be installed manually: cursor --install-extension ${VSIX_PATH}"
+  echo "Error: Failed to download extension from ${VSIX_DOWNLOAD_URL}"
+  exit 1
 fi

@@ -3,7 +3,6 @@ import * as vscode from "vscode";
 import { watchAuthState } from "./auth";
 import { resolveConfig, getWatchablePath } from "./config";
 import * as log from "./log";
-import type { GleanMcpConfig } from "./types";
 
 let registeredServerName: string | null = null;
 let configWatcher: fs.FSWatcher | null = null;
