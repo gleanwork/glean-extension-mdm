@@ -99,7 +99,7 @@ function stopSignInReminder() {
 }
 
 async function promptSignIn() {
-  const action = await vscode.window.showErrorMessage(
+  const action = await vscode.window.showInformationMessage(
     "Glean MCP server requires authentication. Sign in to start using Glean tools in Cursor.",
     "Sign in"
   );
