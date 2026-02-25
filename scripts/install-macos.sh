@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-VSIX_DOWNLOAD_URL="https://github.com/travis-hoover-glean/glean-extension-mdm/releases/latest/download/glean-mcp.vsix"
+VSIX_DOWNLOAD_URL="https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean-mcp.vsix"
 VSIX_PATH="/tmp/glean-mcp.vsix"
 CONFIG_DIR="/Library/Application Support/Glean MDM"
 CONFIG_PATH="${CONFIG_DIR}/mcp-config.json"

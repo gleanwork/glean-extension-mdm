@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/travis-hoover-glean/glean-extension-mdm"
+    "url": "https://github.com/gleanwork/glean-extension-mdm"
   },
   "icon": "icon.png",
   "engines": {
