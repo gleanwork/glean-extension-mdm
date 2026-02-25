@@ -2,7 +2,7 @@
   "name": "glean-mdm",
   "displayName": "Glean MDM",
   "description": "Automatically connects Cursor to your organization's Glean MDM server via MDM-managed configuration",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "glean",
   "license": "MIT",
   "repository": {
