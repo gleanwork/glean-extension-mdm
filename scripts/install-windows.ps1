@@ -16,7 +16,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VsixDownloadUrl = "https://example.com/path/to/glean-mcp.vsix"
+$VsixDownloadUrl = "https://github.com/travis-hoover-glean/glean-mcp-mdm/releases/latest/download/glean-mcp.vsix"
 $VsixPath = Join-Path $env:TEMP "glean-mcp.vsix"
 $ConfigDir = Join-Path $env:ProgramData "Glean"
 $ConfigPath = Join-Path $ConfigDir "mcp-config.json"
