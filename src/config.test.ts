@@ -30,17 +30,6 @@ const DEFAULT_SERVER_NAME = "glean_default_mdm";
 
 vi.mock("os", () => ({ homedir: () => MOCK_HOME }));
 
-let settingsStore: Record<string, string> = {};
-
-vi.mock("vscode", () => ({
-  workspace: {
-    getConfiguration: () => ({
-      get: <T>(key: string): T | undefined =>
-        settingsStore[key] as T | undefined,
-    }),
-  },
-}));
-
 // fs is mocked per-test via spies so we can change behaviour in each case.
 import * as fs from "fs";
 vi.mock("fs", async () => {
@@ -82,14 +71,6 @@ beforeEach(() => {
     throw new Error("file not found");
   });
   existsSyncMock.mockImplementation(() => false);
-  settingsStore = {};
-  delete process.env.GLEAN_MCP_URL;
-  delete process.env.GLEAN_MCP_SERVER_NAME;
-});
-
-afterEach(() => {
-  delete process.env.GLEAN_MCP_URL;
-  delete process.env.GLEAN_MCP_SERVER_NAME;
 });
 
 describe("resolveConfig()", () => {
@@ -125,28 +106,6 @@ describe("resolveConfig()", () => {
     });
   });
 
-  it("falls back to env vars when no config files exist", () => {
-    process.env.GLEAN_MCP_URL = "https://env.example.com/mcp";
-    process.env.GLEAN_MCP_SERVER_NAME = "env_server";
-
-    expect(resolveConfig()).toEqual({
-      serverName: "env_server",
-      url: "https://env.example.com/mcp",
-    });
-  });
-
-  it("falls back to Cursor settings as last resort", () => {
-    settingsStore = {
-      serverUrl: "https://settings.example.com/mcp",
-      serverName: "settings_server",
-    };
-
-    expect(resolveConfig()).toEqual({
-      serverName: "settings_server",
-      url: "https://settings.example.com/mcp",
-    });
-  });
-
   it("uses DEFAULT_SERVER_NAME when serverName missing from file", () => {
     stubFileContents({
       [SYSTEM_PATH]: JSON.stringify({ url: "https://example.com/mcp" }),
@@ -155,15 +114,6 @@ describe("resolveConfig()", () => {
     expect(resolveConfig()).toEqual({
       serverName: DEFAULT_SERVER_NAME,
       url: "https://example.com/mcp",
-    });
-  });
-
-  it("uses DEFAULT_SERVER_NAME when GLEAN_MCP_SERVER_NAME not set", () => {
-    process.env.GLEAN_MCP_URL = "https://env.example.com/mcp";
-
-    expect(resolveConfig()).toEqual({
-      serverName: DEFAULT_SERVER_NAME,
-      url: "https://env.example.com/mcp",
     });
   });
 
@@ -189,15 +139,17 @@ describe("resolveConfig()", () => {
     expect(resolveConfig()).toBeNull();
   });
 
-  it("higher-priority source wins when multiple sources available", () => {
+  it("system config wins over user config when both exist", () => {
     stubFileContents({
       [SYSTEM_PATH]: JSON.stringify({
         serverName: "system_server",
         url: "https://system.example.com/mcp",
       }),
+      [USER_PATH]: JSON.stringify({
+        serverName: "user_server",
+        url: "https://user.example.com/mcp",
+      }),
     });
-    process.env.GLEAN_MCP_URL = "https://env.example.com/mcp";
-    settingsStore = { serverUrl: "https://settings.example.com/mcp" };
 
     expect(resolveConfig()).toEqual({
       serverName: "system_server",

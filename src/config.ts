@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import * as vscode from "vscode";
 import type { GleanMdmConfig } from "./types";
 
 const DEFAULT_SERVER_NAME = "glean_default_mdm";
@@ -55,35 +54,10 @@ function configFromFile(filePath: string): GleanMdmConfig | null {
   };
 }
 
-function configFromEnv(): GleanMdmConfig | null {
-  const url = process.env.GLEAN_MCP_URL;
-  if (!url) {
-    return null;
-  }
-  return {
-    serverName: process.env.GLEAN_MCP_SERVER_NAME || DEFAULT_SERVER_NAME,
-    url,
-  };
-}
-
-function configFromSettings(): GleanMdmConfig | null {
-  const settings = vscode.workspace.getConfiguration("gleanMdm");
-  const url = settings.get<string>("serverUrl");
-  if (!url) {
-    return null;
-  }
-  return {
-    serverName: settings.get<string>("serverName") || DEFAULT_SERVER_NAME,
-    url,
-  };
-}
-
 /**
  * Resolve Glean MDM config using this priority:
  * 1. System-level config file (MDM-managed)
  * 2. User-level config file (~/.glean_mdm/mcp-config.json)
- * 3. Environment variables (GLEAN_MCP_URL, GLEAN_MCP_SERVER_NAME)
- * 4. VS Code / Cursor settings (gleanMdm.serverUrl, gleanMdm.serverName)
  */
 export function resolveConfig(): GleanMdmConfig | null {
   const systemPath = getSystemConfigPath();
@@ -93,17 +67,7 @@ export function resolveConfig(): GleanMdmConfig | null {
   }
 
   const userPath = getUserConfigPath();
-  const userConfig = configFromFile(userPath);
-  if (userConfig) {
-    return userConfig;
-  }
-
-  const envConfig = configFromEnv();
-  if (envConfig) {
-    return envConfig;
-  }
-
-  return configFromSettings();
+  return configFromFile(userPath);
 }
 
 /**

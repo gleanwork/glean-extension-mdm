@@ -34,8 +34,6 @@ A user-level config at `~/.glean/mcp-config.json` is also supported for developm
 
 1. System config file (MDM-managed, paths above)
 2. User config file (`~/.glean/mcp-config.json`)
-3. Environment variables: `GLEAN_MCP_URL`, `GLEAN_MCP_SERVER_NAME`
-4. Cursor settings: `gleanMdm.serverUrl`, `gleanMdm.serverName`
 
 ## MDM deployment
 

@@ -20,23 +20,7 @@
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
-  "contributes": {
-    "configuration": {
-      "title": "Glean MDM",
-      "properties": {
-        "gleanMdm.serverName": {
-          "type": "string",
-          "description": "Display name for the Glean MDM server",
-          "default": "glean"
-        },
-        "gleanMdm.serverUrl": {
-          "type": "string",
-          "description": "URL of the Glean MDM server (e.g. https://company-be.glean.com/mcp/default)",
-          "default": ""
-        }
-      }
-    }
-  },
+  "contributes": {},
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",

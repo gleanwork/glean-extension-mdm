@@ -2,7 +2,9 @@ import * as vscode from "vscode";
 import * as log from "./log";
 
 const SIGN_IN_REMINDER_MS = 15 * 60 * 1000; // 15 minutes
+const MIN_UNFOCUSED_MS = 60 * 1000; // 1 minute
 let signInInterval: ReturnType<typeof setInterval> | null = null;
+let lastUnfocusedAt: number = performance.now();
 
 /**
  * Watches the auth state of a registered MCP server by accessing the
@@ -31,6 +33,23 @@ export function watchAuthState(
   if (disposable?.dispose) {
     context.subscriptions.push(disposable);
   }
+
+  context.subscriptions.push( 
+    vscode.window.onDidChangeWindowState((state) => {
+      if (!state.focused) {
+        lastUnfocusedAt = performance.now();
+        return;
+      }
+
+      const elapsed = performance.now() - lastUnfocusedAt;
+      log.info(`Window re-focused after ${Math.round(elapsed / 1000)}s`);
+
+      if (elapsed >= MIN_UNFOCUSED_MS) {
+        stopSignInReminder();
+        checkAuthAndPrompt(lease, getServerName());
+      }
+    })
+  );
 }
 
 function getMcpLease(): any | null {
@@ -99,11 +118,11 @@ function stopSignInReminder() {
 }
 
 async function promptSignIn() {
-  const action = await vscode.window.showInformationMessage(
-    "Glean MCP server requires authentication. Sign in to start using Glean tools in Cursor.",
+  const action = await vscode.window.showErrorMessage(
+    "Glean MCP requires authentication. Sign in to start using Glean in Cursor.",
     "Sign in"
   );
-
+  
   if (action === "Sign in") {
     await vscode.commands.executeCommand("aiSettings.action.open.mcp");
   }
