@@ -1,7 +1,8 @@
 import * as vscode from "vscode";
 import * as log from "./log";
 
-let signInPromptShown = false;
+const SIGN_IN_REMINDER_MS = 15 * 60 * 1000; // 15 minutes
+let signInInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Watches the auth state of a registered MCP server by accessing the
@@ -12,10 +13,12 @@ export function watchAuthState(
   context: vscode.ExtensionContext,
   getServerName: () => string | null,
 ) {
+  context.subscriptions.push({ dispose: stopSignInReminder });
+
   const lease = getMcpLease();
   if (!lease || typeof lease.onDidChange !== "function") {
     log.warn("Cannot watch auth state: lease or onDidChange not available, falling back to sign-in prompt");
-    promptSignIn();
+    startSignInReminder();
     return;
   }
 
@@ -68,14 +71,31 @@ async function checkAuthAndPrompt(lease: any, serverName: string | null): Promis
     log.info(`Auth state for "${clientKey}": kind=${state?.kind}`);
 
     if (state?.kind === "ready") {
-      signInPromptShown = false;
-    } else if (state?.kind === "requires_authentication" && !signInPromptShown) {
-      signInPromptShown = true;
-      promptSignIn();
+      stopSignInReminder();
+    } else if (state?.kind === "requires_authentication") {
+      startSignInReminder();
     }
   } catch (err) {
     log.error("Failed to check auth state:", err);
   }
+}
+
+function startSignInReminder() {
+  if (signInInterval) {
+    return;
+  }
+  log.info("Starting sign-in reminder interval");
+  promptSignIn();
+  signInInterval = setInterval(() => promptSignIn(), SIGN_IN_REMINDER_MS);
+}
+
+function stopSignInReminder() {
+  if (!signInInterval) {
+    return;
+  }
+  log.info("Stopping sign-in reminder interval");
+  clearInterval(signInInterval);
+  signInInterval = null;
 }
 
 async function promptSignIn() {
