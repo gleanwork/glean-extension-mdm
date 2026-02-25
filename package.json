@@ -2,7 +2,7 @@
   "name": "glean-mcp",
   "displayName": "Glean MCP",
   "description": "Automatically connects Cursor to your organization's Glean MCP server via MDM-managed configuration",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "glean",
   "license": "MIT",
   "repository": {
