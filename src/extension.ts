@@ -73,6 +73,11 @@ async function registerFromConfig() {
     log.info(
       `Skipping registration: "${duplicate.clientKey}" already serves ${config.url} (state=${duplicate.state})`,
     );
+    if (registeredServerName) {
+      log.info(`Unregistering own server "${registeredServerName}" in favor of duplicate`);
+      vscode.cursor.mcp.unregisterServer(registeredServerName);
+      registeredServerName = null;
+    }
     monitoredClientKey = duplicate.clientKey;
     if (duplicate.state === "requires_authentication") {
       startSignInReminder();
