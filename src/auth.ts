@@ -165,26 +165,3 @@ async function promptSignIn() {
     await vscode.commands.executeCommand("aiSettings.action.open.mcp");
   }
 }
-
-/**
- * Probes the cursor-mcp lease API and dumps every registered MCP client
- * to the output channel for diagnostics.
- */
-export async function dumpLeaseClients(): Promise<void> {
-  const clients = await getLeaseClients();
-  if (clients.length === 0) {
-    log.warn("dumpLeaseClients: no clients found (lease may be unavailable)");
-    vscode.window.showWarningMessage("No MCP clients found (lease API may be unavailable).");
-    return;
-  }
-
-  log.info("--- lease dump start ---");
-  log.info(`Found ${clients.length} client(s)`);
-
-  for (const c of clients) {
-    log.info(`  [${c.clientKey}] url=${c.url ?? "(none)"} state=${c.state ?? "unknown"}`);
-  }
-
-  log.info("--- lease dump end ---");
-  vscode.window.showInformationMessage('Lease dump written to "Glean MDM" output channel.');
-}

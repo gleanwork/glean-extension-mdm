@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as vscode from "vscode";
-import { watchAuthState, dumpLeaseClients, getLeaseClients, toLeaseClientKey, startSignInReminder } from "./auth";
+import { watchAuthState, getLeaseClients, toLeaseClientKey, startSignInReminder } from "./auth";
 import { resolveConfig, getWatchablePath } from "./config";
 import * as log from "./log";
 
@@ -32,7 +32,6 @@ export function activate(context: vscode.ExtensionContext) {
   watchAuthState(context, () => monitoredClientKey);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("glean-mdm.debugLease", dumpLeaseClients),
     { dispose: cleanup },
     { dispose: () => log.dispose() },
   );
