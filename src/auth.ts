@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as log from "./log";
+import type { McpClientInfo } from "./types";
 
 const SIGN_IN_REMINDER_MS = 15 * 60 * 1000; // 15 minutes
 const MIN_UNFOCUSED_MS = 60 * 1000; // 1 minute
@@ -7,13 +8,15 @@ let signInInterval: ReturnType<typeof setInterval> | null = null;
 let lastUnfocusedAt: number = performance.now();
 
 /**
- * Watches the auth state of a registered MCP server by accessing the
- * cursor-mcp extension's exported lease API. Falls back to an unconditional
+ * Watches the auth state of an MCP server by accessing the cursor-mcp
+ * extension's exported lease API. The getClientKey callback returns the
+ * lease client key to monitor -- this may be our own registered server
+ * or an existing duplicate we deferred to. Falls back to an unconditional
  * sign-in prompt when the lease API is unavailable.
  */
 export function watchAuthState(
   context: vscode.ExtensionContext,
-  getServerName: () => string | null,
+  getClientKey: () => string | null,
 ) {
   context.subscriptions.push({ dispose: stopSignInReminder });
 
@@ -27,7 +30,7 @@ export function watchAuthState(
   log.info("Watching MCP auth state via lease.onDidChange");
 
   const disposable = lease.onDidChange(() => {
-    checkAuthAndPrompt(lease, getServerName());
+    checkAuthAndPrompt(lease, getClientKey());
   });
 
   if (disposable?.dispose) {
@@ -46,7 +49,7 @@ export function watchAuthState(
 
       if (elapsed >= MIN_UNFOCUSED_MS) {
         stopSignInReminder();
-        checkAuthAndPrompt(lease, getServerName());
+        checkAuthAndPrompt(lease, getClientKey());
       }
     })
   );
@@ -68,16 +71,51 @@ function getMcpLease(): any | null {
   return api.getMcpLease();
 }
 
-function toLeaseClientKey(serverName: string): string {
+export function toLeaseClientKey(serverName: string): string {
   return `user-glean.glean-mdm-extension-${serverName}`;
 }
 
-async function checkAuthAndPrompt(lease: any, serverName: string | null): Promise<void> {
-  if (!serverName) {
-    return;
+export async function getLeaseClients(): Promise<McpClientInfo[]> {
+  const lease = getMcpLease();
+  if (!lease) {
+    return [];
   }
 
-  const clientKey = toLeaseClientKey(serverName);
+  try {
+    const clients = await lease.getClients();
+    if (!clients || typeof clients !== "object") {
+      return [];
+    }
+
+    const results: McpClientInfo[] = [];
+    for (const key of Object.keys(clients)) {
+      const client = clients[key];
+      let state: string | undefined;
+      if (typeof client.getState === "function") {
+        try {
+          const s = await client.getState({});
+          state = s?.kind;
+        } catch {
+          // ignore
+        }
+      }
+      results.push({
+        clientKey: key,
+        url: client.config?.url,
+        state,
+      });
+    }
+    return results;
+  } catch (err) {
+    log.error("getLeaseClients failed:", err);
+    return [];
+  }
+}
+
+async function checkAuthAndPrompt(lease: any, clientKey: string | null): Promise<void> {
+  if (!clientKey) {
+    return;
+  }
 
   try {
     const clients = await lease.getClients();
@@ -99,7 +137,7 @@ async function checkAuthAndPrompt(lease: any, serverName: string | null): Promis
   }
 }
 
-function startSignInReminder() {
+export function startSignInReminder() {
   if (signInInterval) {
     return;
   }
@@ -126,4 +164,27 @@ async function promptSignIn() {
   if (action === "Sign in") {
     await vscode.commands.executeCommand("aiSettings.action.open.mcp");
   }
+}
+
+/**
+ * Probes the cursor-mcp lease API and dumps every registered MCP client
+ * to the output channel for diagnostics.
+ */
+export async function dumpLeaseClients(): Promise<void> {
+  const clients = await getLeaseClients();
+  if (clients.length === 0) {
+    log.warn("dumpLeaseClients: no clients found (lease may be unavailable)");
+    vscode.window.showWarningMessage("No MCP clients found (lease API may be unavailable).");
+    return;
+  }
+
+  log.info("--- lease dump start ---");
+  log.info(`Found ${clients.length} client(s)`);
+
+  for (const c of clients) {
+    log.info(`  [${c.clientKey}] url=${c.url ?? "(none)"} state=${c.state ?? "unknown"}`);
+  }
+
+  log.info("--- lease dump end ---");
+  vscode.window.showInformationMessage('Lease dump written to "Glean MDM" output channel.');
 }

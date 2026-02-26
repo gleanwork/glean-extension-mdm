@@ -37,3 +37,9 @@ export interface GleanMdmConfig {
   serverName: string;
   url: string;
 }
+
+export interface McpClientInfo {
+  clientKey: string;
+  url: string | undefined;
+  state: string | undefined;
+}

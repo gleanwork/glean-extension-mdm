@@ -1,11 +1,15 @@
 import * as fs from "fs";
 import * as vscode from "vscode";
-import { watchAuthState } from "./auth";
+import { watchAuthState, dumpLeaseClients, getLeaseClients, toLeaseClientKey, startSignInReminder } from "./auth";
 import { resolveConfig, getWatchablePath } from "./config";
 import * as log from "./log";
 
+const LEASE_SETTLE_MS = 5_000;
+
 let registeredServerName: string | null = null;
+let monitoredClientKey: string | null = null;
 let configWatcher: fs.FSWatcher | null = null;
+let registrationTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
   log.info("Glean MDM extension activating");
@@ -18,11 +22,17 @@ export function activate(context: vscode.ExtensionContext) {
     return;
   }
 
-  registerFromConfig();
+  log.info(`Deferring registration by ${LEASE_SETTLE_MS}ms to let other MCP servers populate`);
+  registrationTimer = setTimeout(() => {
+    registrationTimer = null;
+    registerFromConfig();
+  }, LEASE_SETTLE_MS);
+
   startConfigWatcher(context);
-  watchAuthState(context, () => registeredServerName);
+  watchAuthState(context, () => monitoredClientKey);
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("glean-mdm.debugLease", dumpLeaseClients),
     { dispose: cleanup },
     { dispose: () => log.dispose() },
   );
@@ -46,12 +56,38 @@ async function registerFromConfig() {
 
   log.info(`Resolved config: serverName=${config.serverName}, url=${config.url}`);
 
+  const ownClientKey = toLeaseClientKey(config.serverName);
+  const existingClients = await getLeaseClients();
+
+  if (existingClients.length > 0) {
+    log.info(`Found ${existingClients.length} existing MCP client(s):`);
+    for (const c of existingClients) {
+      log.info(`  [${c.clientKey}] url=${c.url ?? "(none)"} state=${c.state ?? "unknown"}`);
+    }
+  }
+
+  const duplicate = existingClients.find(
+    (c) => c.url === config.url && c.clientKey !== ownClientKey,
+  );
+
+  if (duplicate) {
+    log.info(
+      `Skipping registration: "${duplicate.clientKey}" already serves ${config.url} (state=${duplicate.state})`,
+    );
+    monitoredClientKey = duplicate.clientKey;
+    if (duplicate.state === "requires_authentication") {
+      startSignInReminder();
+    }
+    return;
+  }
+
   if (registeredServerName && registeredServerName !== config.serverName) {
     log.info(`Server name changed from "${registeredServerName}" to "${config.serverName}", unregistering old server`);
     vscode.cursor.mcp.unregisterServer(registeredServerName);
   }
 
   registeredServerName = config.serverName;
+  monitoredClientKey = ownClientKey;
 
   await vscode.cursor.mcp.registerServer({
     name: config.serverName,
@@ -94,6 +130,11 @@ function startConfigWatcher(context: vscode.ExtensionContext) {
 }
 
 function cleanup() {
+  if (registrationTimer) {
+    clearTimeout(registrationTimer);
+    registrationTimer = null;
+  }
+
   if (registeredServerName) {
     try {
       log.info(`Unregistering MCP server "${registeredServerName}"`);
