@@ -34,17 +34,46 @@ $config = @{
 Set-Content -Path $ConfigPath -Value $config -Encoding UTF8
 Write-Host "Config written to $ConfigPath"
 
-# Download and install extension if Cursor CLI is available
-$cursorCmd = Get-Command cursor -ErrorAction SilentlyContinue
-if (-not $cursorCmd) {
-    Write-Warning "'cursor' CLI not found. Skipping extension install."
-    exit 0
+# Locate the Cursor CLI, checking PATH and well-known install locations.
+# When MDM (Intune, SCCM) runs this script as SYSTEM, PATH may not include
+# the directory where cursor.cmd is installed.
+function Find-CursorCli {
+    # 1. Check PATH
+    $cmd = Get-Command cursor -ErrorAction SilentlyContinue
+    if ($cmd) {
+        return $cmd.Source
+    }
+
+    # 2. Check machine-wide install
+    $machinePath = Join-Path $env:ProgramFiles "Cursor\resources\app\bin\cursor.cmd"
+    if (Test-Path $machinePath) {
+        return $machinePath
+    }
+
+    # 3. Check per-user installs across all user profiles
+    $usersDir = Split-Path $env:PUBLIC
+    foreach ($profile in Get-ChildItem $usersDir -Directory -ErrorAction SilentlyContinue) {
+        $userPath = Join-Path $profile.FullName "AppData\Local\Programs\cursor\resources\app\bin\cursor.cmd"
+        if (Test-Path $userPath) {
+            return $userPath
+        }
+    }
+
+    return $null
 }
+
+$cursorCmd = Find-CursorCli
+if (-not $cursorCmd) {
+    Write-Error "'cursor' CLI not found in PATH or known install locations."
+    exit 1
+}
+
+Write-Host "Found cursor CLI at: $cursorCmd"
 
 Write-Host "Downloading extension from $VsixDownloadUrl..."
 try {
     Invoke-WebRequest -Uri $VsixDownloadUrl -OutFile $VsixPath -UseBasicParsing
-    & cursor --install-extension $VsixPath
+    & $cursorCmd --install-extension $VsixPath
     Remove-Item -Path $VsixPath -Force -ErrorAction SilentlyContinue
     Write-Host "Extension installed successfully."
 } catch {

@@ -34,15 +34,43 @@ EOF
 chmod 644 "$CONFIG_PATH"
 echo "Config written to ${CONFIG_PATH}"
 
-# Download and install extension if Cursor CLI is available
-if ! command -v cursor &> /dev/null; then
-  echo "Warning: 'cursor' CLI not found. Skipping extension install."
-  exit 0
-fi
+# Locate the Cursor CLI, checking PATH and well-known install locations.
+# When MDM runs this script as root, PATH is typically minimal
+# (/usr/bin:/bin:/usr/sbin:/sbin) and won't include /usr/local/bin.
+find_cursor_cli() {
+  if command -v cursor &> /dev/null; then
+    echo "cursor"
+    return
+  fi
+
+  if [ -x "/usr/local/bin/cursor" ]; then
+    echo "/usr/local/bin/cursor"
+    return
+  fi
+
+  if [ -x "/usr/bin/cursor" ]; then
+    echo "/usr/bin/cursor"
+    return
+  fi
+
+  if [ -x "/opt/Cursor/resources/app/bin/cursor" ]; then
+    echo "/opt/Cursor/resources/app/bin/cursor"
+    return
+  fi
+
+  return 1
+}
+
+CURSOR_CMD=$(find_cursor_cli) || {
+  echo "Error: 'cursor' CLI not found in PATH or known install locations."
+  exit 1
+}
+
+echo "Found cursor CLI at: ${CURSOR_CMD}"
 
 echo "Downloading extension from ${VSIX_DOWNLOAD_URL}..."
 if curl -fsSL -o "$VSIX_PATH" "$VSIX_DOWNLOAD_URL"; then
-  cursor --install-extension "$VSIX_PATH"
+  "$CURSOR_CMD" --install-extension "$VSIX_PATH"
   rm -f "$VSIX_PATH"
   echo "Extension installed successfully."
 else
