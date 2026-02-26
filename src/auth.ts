@@ -1,11 +1,15 @@
 import * as vscode from "vscode";
 import * as log from "./log";
 import type { McpClientInfo } from "./types";
+import { trackEvent } from "./analytics";
 
 const SIGN_IN_REMINDER_MS = 15 * 60 * 1000; // 15 minutes
 const MIN_UNFOCUSED_MS = 60 * 1000; // 1 minute
 let signInInterval: ReturnType<typeof setInterval> | null = null;
 let lastUnfocusedAt: number = performance.now();
+let isNotificationOpen = false;
+const MAX_DISMISSALS = 5;
+let dismissCount = 0;
 
 /**
  * Watches the auth state of an MCP server by accessing the cursor-mcp
@@ -23,14 +27,14 @@ export function watchAuthState(
   const lease = getMcpLease();
   if (!lease || typeof lease.onDidChange !== "function") {
     log.warn("Cannot watch auth state: lease or onDidChange not available, falling back to sign-in prompt");
-    startSignInReminder();
+    startSignInReminder("startup_fallback");
     return;
   }
 
   log.info("Watching MCP auth state via lease.onDidChange");
 
   const disposable = lease.onDidChange(() => {
-    checkAuthAndPrompt(lease, getClientKey());
+    checkAuthAndPrompt(lease, getClientKey(), "auth_state_change");
   });
 
   if (disposable?.dispose) {
@@ -49,7 +53,7 @@ export function watchAuthState(
 
       if (elapsed >= MIN_UNFOCUSED_MS) {
         stopSignInReminder();
-        checkAuthAndPrompt(lease, getClientKey());
+        checkAuthAndPrompt(lease, getClientKey(), "refocus");
       }
     })
   );
@@ -112,7 +116,7 @@ export async function getLeaseClients(): Promise<McpClientInfo[]> {
   }
 }
 
-async function checkAuthAndPrompt(lease: any, clientKey: string | null): Promise<void> {
+async function checkAuthAndPrompt(lease: any, clientKey: string | null, reason: string): Promise<void> {
   if (!clientKey) {
     return;
   }
@@ -128,22 +132,23 @@ async function checkAuthAndPrompt(lease: any, clientKey: string | null): Promise
     log.info(`Auth state for "${clientKey}": kind=${state?.kind}`);
 
     if (state?.kind === "ready") {
+      trackEvent("auth_complete");
       stopSignInReminder();
     } else if (state?.kind === "requires_authentication") {
-      startSignInReminder();
+      startSignInReminder(reason);
     }
   } catch (err) {
     log.error("Failed to check auth state:", err);
   }
 }
 
-export function startSignInReminder() {
+export function startSignInReminder(reason: string) {
   if (signInInterval) {
     return;
   }
   log.info("Starting sign-in reminder interval");
-  promptSignIn();
-  signInInterval = setInterval(() => promptSignIn(), SIGN_IN_REMINDER_MS);
+  promptSignIn(reason);
+  signInInterval = setInterval(() => promptSignIn("reminder"), SIGN_IN_REMINDER_MS);
 }
 
 function stopSignInReminder() {
@@ -155,13 +160,39 @@ function stopSignInReminder() {
   signInInterval = null;
 }
 
-async function promptSignIn() {
-  const action = await vscode.window.showErrorMessage(
-    "Glean MCP requires authentication. Sign in to start using Glean in Cursor.",
-    "Sign in"
-  );
-  
-  if (action === "Sign in") {
-    await vscode.commands.executeCommand("aiSettings.action.open.mcp");
+async function promptSignIn(reason: string) {
+  if (dismissCount >= MAX_DISMISSALS) {
+    log.info("Sign-in notification suppressed: user dismissed too many times this session");
+    stopSignInReminder();
+    return;
+  }
+
+  if (isNotificationOpen) {
+    log.info("Sign-in notification already open, skipping");
+    return;
+  }
+
+  trackEvent("notification_shown", { reason });
+  isNotificationOpen = true;
+
+  try {
+    const action = await vscode.window.showErrorMessage(
+      "Glean MCP requires authentication. Sign in to start using Glean in Cursor.",
+      "Sign in"
+    );
+
+    if (action === "Sign in") {
+      trackEvent("sign_in_click", { reason });
+      await vscode.commands.executeCommand("aiSettings.action.open.mcp");
+    } else {
+      dismissCount++;
+      trackEvent("sign_in_dismiss", { reason, dismiss_count: String(dismissCount) });
+      if (dismissCount >= MAX_DISMISSALS) {
+        log.info(`User dismissed sign-in ${MAX_DISMISSALS} times, suppressing further notifications this session`);
+        stopSignInReminder();
+      }
+    }
+  } finally {
+    isNotificationOpen = false;
   }
 }

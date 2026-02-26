@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as vscode from "vscode";
+import { initAnalytics, trackEvent } from "./analytics";
 import { watchAuthState, getLeaseClients, toLeaseClientKey, startSignInReminder } from "./auth";
 import { resolveConfig, getWatchablePath } from "./config";
 import * as log from "./log";
@@ -21,6 +22,10 @@ export function activate(context: vscode.ExtensionContext) {
     );
     return;
   }
+
+  const config = resolveConfig();
+  initAnalytics(context, config?.gaMeasurementId, config?.gaApiSecret);
+  trackEvent("extension_activated");
 
   log.info(`Deferring registration by ${LEASE_SETTLE_MS}ms to let other MCP servers populate`);
   registrationTimer = setTimeout(() => {
@@ -80,7 +85,7 @@ async function registerFromConfig() {
     }
     monitoredClientKey = duplicate.clientKey;
     if (duplicate.state === "requires_authentication") {
-      startSignInReminder();
+      startSignInReminder("duplicate_requires_auth");
     }
     return;
   }

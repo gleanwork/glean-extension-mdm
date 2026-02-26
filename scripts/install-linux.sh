@@ -3,7 +3,7 @@
 # MDM install script for Linux.
 # Installs the Glean MDM extension into Cursor and deploys the config file.
 #
-# Usage: install-linux.sh <glean_mcp_url> [server_name]
+# Usage: install-linux.sh <glean_mcp_url> [server_name] [ga_measurement_id] [ga_api_secret]
 #
 # This script is intended to be run as root.
 
@@ -16,11 +16,24 @@ CONFIG_PATH="${CONFIG_DIR}/mcp-config.json"
 
 GLEAN_MCP_URL="${1:-}"
 SERVER_NAME="${2:-glean_default_mdm}"
+GA_MEASUREMENT_ID="${3:-}"
+GA_API_SECRET="${4:-}"
 
 if [ -z "$GLEAN_MCP_URL" ]; then
   echo "Error: Glean MCP URL is required as the first argument."
-  echo "Usage: $0 <glean_mcp_url> [server_name]"
+  echo "Usage: $0 <glean_mcp_url> [server_name] [ga_measurement_id] [ga_api_secret]"
   exit 1
+fi
+
+# Build optional GA analytics fields
+GA_FIELDS=""
+if [ -n "$GA_MEASUREMENT_ID" ] && [ -n "$GA_API_SECRET" ]; then
+  GA_FIELDS=$(cat <<GAEOF
+,
+  "gaMeasurementId": "${GA_MEASUREMENT_ID}",
+  "gaApiSecret": "${GA_API_SECRET}"
+GAEOF
+)
 fi
 
 # Deploy config file
@@ -28,7 +41,7 @@ mkdir -p "$CONFIG_DIR"
 cat > "$CONFIG_PATH" <<EOF
 {
   "serverName": "${SERVER_NAME}",
-  "url": "${GLEAN_MCP_URL}"
+  "url": "${GLEAN_MCP_URL}"${GA_FIELDS}
 }
 EOF
 chmod 644 "$CONFIG_PATH"

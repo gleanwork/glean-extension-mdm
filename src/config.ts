@@ -45,13 +45,22 @@ function configFromFile(filePath: string): GleanMdmConfig | null {
   if (!data || typeof data.url !== "string" || !data.url) {
     return null;
   }
-  return {
+  const config: GleanMdmConfig = {
     serverName:
       typeof data.serverName === "string" && data.serverName
         ? data.serverName
         : DEFAULT_SERVER_NAME,
     url: data.url,
   };
+
+  if (typeof data.gaMeasurementId === "string" && data.gaMeasurementId) {
+    config.gaMeasurementId = data.gaMeasurementId;
+  }
+  if (typeof data.gaApiSecret === "string" && data.gaApiSecret) {
+    config.gaApiSecret = data.gaApiSecret;
+  }
+
+  return config;
 }
 
 /**

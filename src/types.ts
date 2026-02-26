@@ -36,6 +36,8 @@ declare module "vscode" {
 export interface GleanMdmConfig {
   serverName: string;
   url: string;
+  gaMeasurementId?: string;
+  gaApiSecret?: string;
 }
 
 export interface McpClientInfo {
