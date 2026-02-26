@@ -17,7 +17,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $VsixDownloadUrl = "https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean.vsix"
-$VsixPath = Join-Path $env:TEMP "gleanvsix"
+$VsixPath = Join-Path $env:TEMP "glean.vsix"
 $ConfigDir = Join-Path $env:ProgramData "Glean MDM"
 $ConfigPath = Join-Path $ConfigDir "mcp-config.json"
 
