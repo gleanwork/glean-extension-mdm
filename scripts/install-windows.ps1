@@ -16,6 +16,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$Version = "0.0.5"
+Write-Host "Glean extension installer v$Version"
+
 $VsixDownloadUrl = "https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean.vsix"
 $VsixPath = Join-Path $env:TEMP "glean.vsix"
 $ConfigDir = Join-Path $env:ProgramData "Glean MDM"
@@ -93,7 +96,7 @@ Write-Host "Target user: $targetUser"
 Write-Host "Target home: $targetHome"
 
 # Remove any previous installation to avoid conflicts on reinstall
-$extPattern = Join-Path $targetHome ".cursor\extensions\glean.glean-mdm-*"
+$extPattern = Join-Path $targetHome ".cursor\extensions\glean.glean-*"
 Remove-Item -Path $extPattern -Recurse -Force -ErrorAction SilentlyContinue
 & $cursorCmd --uninstall-extension glean.glean-mdm 2>$null | Out-Null
 

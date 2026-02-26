@@ -9,6 +9,9 @@
 
 set -euo pipefail
 
+VERSION="0.0.5"
+echo "Glean extension installer v${VERSION}"
+
 VSIX_DOWNLOAD_URL="https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean.vsix"
 VSIX_PATH="/tmp/glean.vsix"
 CONFIG_DIR="/etc/glean_mdm"
@@ -82,7 +85,7 @@ TARGET_HOME=$(eval echo "~${TARGET_USER}")
 echo "Target home: ${TARGET_HOME}"
 
 # Remove any previous installation to avoid ownership conflicts on reinstall
-rm -rf "${TARGET_HOME}/.cursor/extensions/glean.glean-mdm-"*
+rm -rf "${TARGET_HOME}/.cursor/extensions/glean.glean-"*
 sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --uninstall-extension glean.glean-mdm 2>/dev/null || true
 
 echo "Downloading extension from ${VSIX_DOWNLOAD_URL}..."
