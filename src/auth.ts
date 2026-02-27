@@ -140,6 +140,15 @@ async function checkAuthAndPrompt(lease: any, clientKey: string | null): Promise
   }
 }
 
+export async function checkAuthStateNow(clientKey: string | null): Promise<void> {
+  const lease = getMcpLease();
+  if (!lease) {
+    startSignInReminder();
+    return;
+  }
+  await checkAuthAndPrompt(lease, clientKey);
+}
+
 export function startSignInReminder() {
   if (signInInterval) {
     return;

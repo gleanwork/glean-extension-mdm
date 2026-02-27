@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as vscode from "vscode";
-import { watchAuthState, getLeaseClients, toLeaseClientKey, startSignInReminder } from "./auth";
+import { watchAuthState, getLeaseClients, toLeaseClientKey, checkAuthStateNow } from "./auth";
 import { resolveConfig, getWatchablePath } from "./config";
 import * as log from "./log";
 
@@ -79,9 +79,7 @@ async function registerFromConfig() {
       registeredServerName = null;
     }
     monitoredClientKey = duplicate.clientKey;
-    if (duplicate.state === "requires_authentication") {
-      startSignInReminder();
-    }
+    await checkAuthStateNow(monitoredClientKey);
     return;
   }
 
@@ -104,6 +102,8 @@ async function registerFromConfig() {
   });
 
   log.info(`Registered MCP server "${config.serverName}"`);
+
+  await checkAuthStateNow(monitoredClientKey);
 }
 
 function startConfigWatcher(context: vscode.ExtensionContext) {
