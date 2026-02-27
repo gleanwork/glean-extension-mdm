@@ -5,7 +5,7 @@ let outputChannel: vscode.OutputChannel | undefined;
 
 function getChannel(): vscode.OutputChannel {
   if (!outputChannel) {
-    outputChannel = vscode.window.createOutputChannel("Glean MDM");
+    outputChannel = vscode.window.createOutputChannel("Glean");
   }
   return outputChannel;
 }
