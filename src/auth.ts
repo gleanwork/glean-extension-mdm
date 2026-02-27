@@ -3,9 +3,7 @@ import * as log from "./log";
 import type { McpClientInfo } from "./types";
 
 const SIGN_IN_REMINDER_MS = 15 * 60 * 1000; // 15 minutes
-const MIN_UNFOCUSED_MS = 60 * 1000; // 1 minute
 let signInInterval: ReturnType<typeof setInterval> | null = null;
-let lastUnfocusedAt: number = performance.now();
 
 const signInMessage = "Search your company's knowledge without leaving your editor. Find docs, examples, and answers right where you work.";
 const signInButton = "Sign in to Glean";
@@ -39,23 +37,6 @@ export function watchAuthState(
   if (disposable?.dispose) {
     context.subscriptions.push(disposable);
   }
-
-  context.subscriptions.push( 
-    vscode.window.onDidChangeWindowState((state) => {
-      if (!state.focused) {
-        lastUnfocusedAt = performance.now();
-        return;
-      }
-
-      const elapsed = performance.now() - lastUnfocusedAt;
-      log.info(`Window re-focused after ${Math.round(elapsed / 1000)}s`);
-
-      if (elapsed >= MIN_UNFOCUSED_MS) {
-        stopSignInReminder();
-        checkAuthAndPrompt(lease, getClientKey());
-      }
-    })
-  );
 }
 
 function getMcpLease(): any | null {

@@ -12,7 +12,7 @@ let configWatcher: fs.FSWatcher | null = null;
 let registrationTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
-  log.info("Glean MDM extension activating");
+  log.info("Glean extension activating");
 
   if (!hasCursorMcpApi()) {
     log.warn("Cursor MCP extension API not available");
@@ -38,7 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  log.info("Glean MDM extension deactivating");
+  log.info("Glean extension deactivating");
   cleanup();
 }
 
