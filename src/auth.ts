@@ -5,6 +5,7 @@ import type { McpClientInfo } from "./types";
 const SIGN_IN_REMINDER_MS = 15 * 60 * 1000; // 15 minutes
 const LEASE_WAIT_TIMEOUT_MS = 60_000;
 let signInInterval: ReturnType<typeof setInterval> | null = null;
+let signInStatusBarItem: vscode.StatusBarItem | null = null;
 
 const signInMessage =
   "Search your company's knowledge without leaving your editor. Find docs, examples, and answers right where you work.";
@@ -139,17 +140,40 @@ export function startSignInReminder() {
     return;
   }
   log.info("Starting sign-in reminder interval");
+  showSignInStatusBarItem();
   promptSignIn();
   signInInterval = setInterval(() => promptSignIn(), SIGN_IN_REMINDER_MS);
 }
 
 export function stopSignInReminder() {
+  hideSignInStatusBarItem();
   if (!signInInterval) {
     return;
   }
   log.info("Stopping sign-in reminder interval");
   clearInterval(signInInterval);
   signInInterval = null;
+}
+
+function showSignInStatusBarItem() {
+  if (signInStatusBarItem) {
+    return;
+  }
+  signInStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  signInStatusBarItem.text = "$(key) Sign in to Glean";
+  signInStatusBarItem.tooltip = signInMessage;
+  signInStatusBarItem.command = "aiSettings.action.open.mcp";
+  signInStatusBarItem.show();
+  log.info("Sign-in status bar item shown");
+}
+
+function hideSignInStatusBarItem() {
+  if (!signInStatusBarItem) {
+    return;
+  }
+  signInStatusBarItem.dispose();
+  signInStatusBarItem = null;
+  log.info("Sign-in status bar item hidden");
 }
 
 async function promptSignIn() {
