@@ -77,12 +77,12 @@ async function registerServer(config: GleanMdmConfig) {
   }
 
   const duplicate = existingClients.find(
-    (c) => c.url === config.url && c.clientKey !== ownClientKey,
+    (c) => c.clientKey !== ownClientKey && isGleanMcpUrl(c.url),
   );
 
   if (duplicate) {
     log.info(
-      `Skipping registration: "${duplicate.clientKey}" already serves ${config.url} (state=${duplicate.state})`,
+      `Skipping registration: "${duplicate.clientKey}" already serves ${duplicate.url} (state=${duplicate.state})`,
     );
     if (registeredServerName) {
       log.info(`Unregistering own server "${registeredServerName}" in favor of duplicate`);
@@ -115,6 +115,16 @@ async function registerServer(config: GleanMdmConfig) {
   });
 
   log.info(`Registered MCP server "extension-${config.serverName}"`);
+}
+
+function isGleanMcpUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.endsWith(".glean.com") && parsed.pathname.startsWith("/mcp/");
+  } catch {
+    return false;
+  }
 }
 
 function cleanup() {
