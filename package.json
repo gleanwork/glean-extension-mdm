@@ -20,7 +20,18 @@
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
-  "contributes": {},
+  "contributes": {
+    "configuration": {
+      "title": "Glean",
+      "properties": {
+        "glean.mcpServerUrl": {
+          "type": "string",
+          "default": "",
+          "description": "MCP server URL for Glean. When set, this takes priority over system and user config files."
+        }
+      }
+    }
+  },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",

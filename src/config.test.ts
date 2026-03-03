@@ -158,6 +158,82 @@ describe("resolveConfig()", () => {
   });
 });
 
+describe("resolveConfig() with extensionUrl", () => {
+  it("extension URL overrides system and user file config", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify({
+        serverName: "system_server",
+        url: "https://system.example.com/mcp",
+      }),
+      [USER_PATH]: JSON.stringify({
+        serverName: "user_server",
+        url: "https://user.example.com/mcp",
+      }),
+    });
+
+    expect(resolveConfig("https://extension.example.com/mcp")).toEqual({
+      serverName: DEFAULT_SERVER_NAME,
+      url: "https://extension.example.com/mcp",
+    });
+  });
+
+  it("extension URL uses DEFAULT_SERVER_NAME", () => {
+    expect(resolveConfig("https://ext.example.com/mcp")).toEqual({
+      serverName: DEFAULT_SERVER_NAME,
+      url: "https://ext.example.com/mcp",
+    });
+  });
+
+  it("falls through to file config when extensionUrl is undefined", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify({
+        serverName: "system_server",
+        url: "https://system.example.com/mcp",
+      }),
+    });
+
+    expect(resolveConfig(undefined)).toEqual({
+      serverName: "system_server",
+      url: "https://system.example.com/mcp",
+    });
+  });
+
+  it("falls through to file config when extensionUrl is empty string", () => {
+    stubFileContents({
+      [USER_PATH]: JSON.stringify({
+        serverName: "user_server",
+        url: "https://user.example.com/mcp",
+      }),
+    });
+
+    expect(resolveConfig("")).toEqual({
+      serverName: "user_server",
+      url: "https://user.example.com/mcp",
+    });
+  });
+
+  it("falls through to file config when extensionUrl is whitespace-only", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify({
+        serverName: "system_server",
+        url: "https://system.example.com/mcp",
+      }),
+    });
+
+    expect(resolveConfig("   ")).toEqual({
+      serverName: "system_server",
+      url: "https://system.example.com/mcp",
+    });
+  });
+
+  it("trims whitespace from extension URL", () => {
+    expect(resolveConfig("  https://ext.example.com/mcp  ")).toEqual({
+      serverName: DEFAULT_SERVER_NAME,
+      url: "https://ext.example.com/mcp",
+    });
+  });
+});
+
 describe("getWatchablePath()", () => {
   it("returns system path when it exists", () => {
     stubExistence([SYSTEM_PATH]);

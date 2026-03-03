@@ -56,10 +56,16 @@ function configFromFile(filePath: string): GleanMdmConfig | null {
 
 /**
  * Resolve Glean MDM config using this priority:
- * 1. System-level config file (MDM-managed)
- * 2. User-level config file (~/.glean_mdm/mcp-config.json)
+ * 1. Extension setting (glean.mcpServerUrl)
+ * 2. System-level config file (MDM-managed)
+ * 3. User-level config file (~/.glean_mdm/mcp-config.json)
  */
-export function resolveConfig(): GleanMdmConfig | null {
+export function resolveConfig(extensionUrl?: string): GleanMdmConfig | null {
+  const trimmed = extensionUrl?.trim();
+  if (trimmed) {
+    return { serverName: DEFAULT_SERVER_NAME, url: trimmed };
+  }
+
   const systemPath = getSystemConfigPath();
   const systemConfig = configFromFile(systemPath);
   if (systemConfig) {
