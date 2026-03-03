@@ -11,7 +11,7 @@ param(
     [string]$GleanMcpUrl,
 
     [Parameter(Mandatory=$false)]
-    [string]$ServerName = "glean-default"
+    [string]$ServerName = "glean_default"
 )
 
 $ErrorActionPreference = "Stop"

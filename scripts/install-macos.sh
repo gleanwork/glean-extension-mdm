@@ -15,7 +15,7 @@ CONFIG_DIR="/Library/Application Support/Glean MDM"
 CONFIG_PATH="${CONFIG_DIR}/mcp-config.json"
 
 GLEAN_MCP_URL="${1:-}"
-SERVER_NAME="${2:-glean-default}"
+SERVER_NAME="${2:-glean_default}"
 
 if [ -z "$GLEAN_MCP_URL" ]; then
   echo "Error: Glean MCP URL is required as the first argument."

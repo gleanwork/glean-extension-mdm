@@ -83,18 +83,9 @@ async function registerServer(config: GleanMdmConfig) {
 
   if (duplicate) {
     log.info(
-      `Skipping registration: "${duplicate.clientKey}" already serves ${config.url} (state=${duplicate.state})`,
+      `Found duplicate server "${duplicate.clientKey}" serving ${config.url} (state=${duplicate.state}), unregistering it`,
     );
-    if (registeredServerName) {
-      log.info(`Unregistering own server "${registeredServerName}" in favor of duplicate`);
-      vscode.cursor.mcp.unregisterServer(registeredServerName);
-      registeredServerName = null;
-    }
-    monitoredClientKey = duplicate.clientKey;
-    if (duplicate.state === "requires_authentication") {
-      startSignInReminder();
-    }
-    return;
+    vscode.cursor.mcp.unregisterServer(duplicate.clientKey);
   }
 
   if (registeredServerName && registeredServerName !== config.serverName) {
