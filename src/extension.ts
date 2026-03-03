@@ -9,6 +9,7 @@ let monitoredClientKey: string | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
   log.info("Glean extension activating");
+  log.info(`Cursor version: ${vscode.version}, Extension version: ${context.extension.packageJSON.version}`);
 
   if (!hasCursorMcpApi()) {
     log.warn("Cursor MCP extension API not available");
