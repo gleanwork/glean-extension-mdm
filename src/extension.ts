@@ -3,6 +3,7 @@ import { waitForLease, getLeaseClients, toLeaseClientKey, startSignInReminder, s
 import { resolveConfig } from "./config";
 import * as log from "./log";
 import type { GleanMdmConfig } from "./types";
+import { isGleanMcpUrl } from "./url";
 
 let registeredServerName: string | null = null;
 let monitoredClientKey: string | null = null;
@@ -115,16 +116,6 @@ async function registerServer(config: GleanMdmConfig) {
   });
 
   log.info(`Registered MCP server "extension-${config.serverName}"`);
-}
-
-function isGleanMcpUrl(url: string | undefined): boolean {
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname.endsWith(".glean.com") && parsed.pathname.startsWith("/mcp/");
-  } catch {
-    return false;
-  }
 }
 
 function cleanup() {
