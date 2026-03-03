@@ -3,7 +3,6 @@ import { waitForLease, getLeaseClients, toLeaseClientKey, startSignInReminder, s
 import { resolveConfig } from "./config";
 import * as log from "./log";
 import type { GleanMdmConfig } from "./types";
-import { isGleanMcpUrl } from "./url";
 
 let registeredServerName: string | null = null;
 let monitoredClientKey: string | null = null;
@@ -78,12 +77,12 @@ async function registerServer(config: GleanMdmConfig) {
   }
 
   const duplicate = existingClients.find(
-    (c) => c.clientKey !== ownClientKey && isGleanMcpUrl(c.url),
+    (c) => c.url === config.url && c.clientKey !== ownClientKey,
   );
 
   if (duplicate) {
     log.info(
-      `Skipping registration: "${duplicate.clientKey}" already serves ${duplicate.url} (state=${duplicate.state})`,
+      `Skipping registration: "${duplicate.clientKey}" already serves ${config.url} (state=${duplicate.state})`,
     );
     if (registeredServerName) {
       log.info(`Unregistering own server "${registeredServerName}" in favor of duplicate`);
