@@ -158,6 +158,151 @@ describe("resolveConfig()", () => {
   });
 });
 
+describe("resolveConfig() with extensionUrl", () => {
+  it("extension URL overrides system and user file config", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify({
+        serverName: "system_server",
+        url: "https://system.example.com/mcp",
+      }),
+      [USER_PATH]: JSON.stringify({
+        serverName: "user_server",
+        url: "https://user.example.com/mcp",
+      }),
+    });
+
+    expect(resolveConfig("https://extension.example.com/mcp")).toEqual({
+      serverName: DEFAULT_SERVER_NAME,
+      url: "https://extension.example.com/mcp",
+    });
+  });
+
+  it("extension URL uses DEFAULT_SERVER_NAME", () => {
+    expect(resolveConfig("https://ext.example.com/mcp")).toEqual({
+      serverName: DEFAULT_SERVER_NAME,
+      url: "https://ext.example.com/mcp",
+    });
+  });
+
+  it("falls through to file config when extensionUrl is undefined", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify({
+        serverName: "system_server",
+        url: "https://system.example.com/mcp",
+      }),
+    });
+
+    expect(resolveConfig(undefined)).toEqual({
+      serverName: "system_server",
+      url: "https://system.example.com/mcp",
+    });
+  });
+
+  it("falls through to file config when extensionUrl is empty string", () => {
+    stubFileContents({
+      [USER_PATH]: JSON.stringify({
+        serverName: "user_server",
+        url: "https://user.example.com/mcp",
+      }),
+    });
+
+    expect(resolveConfig("")).toEqual({
+      serverName: "user_server",
+      url: "https://user.example.com/mcp",
+    });
+  });
+
+  it("falls through to file config when extensionUrl is whitespace-only", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify({
+        serverName: "system_server",
+        url: "https://system.example.com/mcp",
+      }),
+    });
+
+    expect(resolveConfig("   ")).toEqual({
+      serverName: "system_server",
+      url: "https://system.example.com/mcp",
+    });
+  });
+
+  it("trims whitespace from extension URL", () => {
+    expect(resolveConfig("  https://ext.example.com/mcp  ")).toEqual({
+      serverName: DEFAULT_SERVER_NAME,
+      url: "https://ext.example.com/mcp",
+    });
+  });
+});
+
+describe("resolveConfig() URL validation", () => {
+  it("skips invalid extension URL and falls through to file config", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify({
+        serverName: "system_server",
+        url: "https://system.example.com/mcp",
+      }),
+    });
+
+    expect(resolveConfig("not-a-url")).toEqual({
+      serverName: "system_server",
+      url: "https://system.example.com/mcp",
+    });
+  });
+
+  it("skips invalid system config URL and falls through to user config", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify({
+        serverName: "system_server",
+        url: "not-a-url",
+      }),
+      [USER_PATH]: JSON.stringify({
+        serverName: "user_server",
+        url: "https://user.example.com/mcp",
+      }),
+    });
+
+    expect(resolveConfig()).toEqual({
+      serverName: "user_server",
+      url: "https://user.example.com/mcp",
+    });
+  });
+
+  it("skips invalid user config URL and returns null", () => {
+    stubFileContents({
+      [USER_PATH]: JSON.stringify({
+        serverName: "user_server",
+        url: "not-a-url",
+      }),
+    });
+
+    expect(resolveConfig()).toBeNull();
+  });
+
+  it("returns null when all sources have invalid URLs", () => {
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify({ url: "bad" }),
+      [USER_PATH]: JSON.stringify({ url: "also-bad" }),
+    });
+
+    expect(resolveConfig("nope")).toBeNull();
+  });
+
+  it("logs invalid URL messages via logger", () => {
+    const messages: string[] = [];
+    stubFileContents({
+      [SYSTEM_PATH]: JSON.stringify({ url: "bad-url" }),
+    });
+
+    resolveConfig("also-bad", (msg) => messages.push(msg));
+
+    expect(messages).toEqual([
+      'Extension setting: invalid URL "also-bad", skipping',
+      `System config (${SYSTEM_PATH}): invalid URL "bad-url", skipping`,
+      `User config (${USER_PATH}): not found`,
+    ]);
+  });
+});
+
 describe("getWatchablePath()", () => {
   it("returns system path when it exists", () => {
     stubExistence([SYSTEM_PATH]);

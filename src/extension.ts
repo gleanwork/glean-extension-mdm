@@ -19,13 +19,12 @@ export function activate(context: vscode.ExtensionContext) {
     return;
   }
 
-  const config = resolveConfig();
+  const extensionUrl = vscode.workspace.getConfiguration("glean").get<string>("mcpServerUrl", "");
+  const config = resolveConfig(extensionUrl, (msg) => log.info(msg));
   if (!config) {
-    log.warn("No Glean MDM config found (checked MDM file, env vars, and settings)");
+    log.warn("No Glean MDM config found (checked extension setting, system file, and user file)");
     return;
   }
-
-  log.info(`Resolved config: serverName=${config.serverName}, url=${config.url}`);
   initializeWhenReady(context, config);
 
   context.subscriptions.push(
