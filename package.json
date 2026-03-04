@@ -2,7 +2,7 @@
   "name": "glean",
   "displayName": "Glean",
   "description": "Connect Cursor to your company's knowledge with Glean",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "publisher": "glean",
   "license": "MIT",
   "repository": {
