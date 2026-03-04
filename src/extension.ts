@@ -74,7 +74,6 @@ async function monitorMcpState(
   // In the case where no MCP clients have been added the lease.onDidChange callback will not be called
   // so we go ahead and register the Glean MCP server to "manually" kick off the change process.
   const timeoutHandle = setTimeout(async () => {
-    leaseHasChanged = false;
     if (!leaseHasChanged) {
       log.info(`No initial MCP clients found, registering Glean MCP server`);
       await registerGleanMcpServer(config);
