@@ -16,8 +16,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$VsixDownloadUrl = "https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean.vsix"
-$VsixPath = Join-Path $env:TEMP "glean.vsix"
 $ConfigDir = Join-Path $env:ProgramData "Glean MDM"
 $ConfigPath = Join-Path $ConfigDir "mcp-config.json"
 
@@ -91,20 +89,11 @@ if (-not $targetHome) {
 
 Write-Host "Target user: $targetUser"
 Write-Host "Target home: $targetHome"
-Write-Host "Downloading extension from $VsixDownloadUrl..."
-try {
-    Invoke-WebRequest -Uri $VsixDownloadUrl -OutFile $VsixPath -UseBasicParsing
+$extDir = Join-Path $targetHome ".cursor\extensions"
+Write-Host "Installing extension as $targetUser..."
+& $cursorCmd --install-extension glean.glean --extensions-dir $extDir
 
-    $extDir = Join-Path $targetHome ".cursor\extensions"
-    Write-Host "Installing extension as $targetUser..."
-    & $cursorCmd --install-extension $VsixPath --extensions-dir $extDir
+# Ensure the target user owns the installed files
+icacls $extDir /grant "${targetUser}:(OI)(CI)F" /T /Q 2>$null | Out-Null
 
-    # Ensure the target user owns the installed files
-    icacls $extDir /grant "${targetUser}:(OI)(CI)F" /T /Q 2>$null | Out-Null
-
-    Remove-Item -Path $VsixPath -Force -ErrorAction SilentlyContinue
-    Write-Host "Extension installed successfully."
-} catch {
-    Write-Error "Failed to download extension from ${VsixDownloadUrl}: $_"
-    exit 1
-}
+Write-Host "Extension installed successfully."

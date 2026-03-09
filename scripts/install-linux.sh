@@ -9,8 +9,6 @@
 
 set -euo pipefail
 
-VSIX_DOWNLOAD_URL="https://github.com/gleanwork/glean-extension-mdm/releases/latest/download/glean.vsix"
-VSIX_PATH="/tmp/glean.vsix"
 CONFIG_DIR="/etc/glean_mdm"
 CONFIG_PATH="${CONFIG_DIR}/mcp-config.json"
 
@@ -86,16 +84,6 @@ rm -rf "${TARGET_HOME}/.cursor/extensions/glean.glean-"*
 sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --uninstall-extension glean.glean-mdm 2>/dev/null || true
 sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --uninstall-extension glean.glean 2>/dev/null || true
 
-echo "Downloading extension from ${VSIX_DOWNLOAD_URL}..."
-
-if curl -fsSL -o "$VSIX_PATH" "$VSIX_DOWNLOAD_URL"; then
-  echo "Installing extension as ${TARGET_USER}..."
-
-  sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --install-extension "$VSIX_PATH"
-  rm -f "$VSIX_PATH"
-
-  echo "Extension installed successfully."
-else
-  echo "Error: Failed to download extension from ${VSIX_DOWNLOAD_URL}"
-  exit 1
-fi
+echo "Installing extension as ${TARGET_USER}..."
+sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --install-extension glean.glean
+echo "Extension installed successfully."
