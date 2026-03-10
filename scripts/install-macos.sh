@@ -80,5 +80,5 @@ sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --uninstall-extension glean.glean-mdm 2>
 sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --uninstall-extension glean.glean 2>/dev/null || true
 
 echo "Installing extension as ${TARGET_USER}..."
-sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --install-extension glean.glean
+sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --install-extension glean.glean --force
 echo "Extension installed successfully."

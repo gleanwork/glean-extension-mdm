@@ -91,7 +91,7 @@ Write-Host "Target user: $targetUser"
 Write-Host "Target home: $targetHome"
 $extDir = Join-Path $targetHome ".cursor\extensions"
 Write-Host "Installing extension as $targetUser..."
-& $cursorCmd --install-extension glean.glean --extensions-dir $extDir
+& $cursorCmd --install-extension glean.glean --force --extensions-dir $extDir
 
 # Ensure the target user owns the installed files
 icacls $extDir /grant "${targetUser}:(OI)(CI)F" /T /Q 2>$null | Out-Null
