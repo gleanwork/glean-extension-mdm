@@ -2,7 +2,7 @@
   "name": "glean",
   "displayName": "Glean",
   "description": "Connect Cursor, Windsurf, and VS Code to your company's knowledge with Glean",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "publisher": "glean",
   "license": "MIT",
   "repository": {
