@@ -149,7 +149,7 @@ export async function activate(context: vscode.ExtensionContext) {
     return;
   }
 
-  if (hasCursorMcpApi()) {
+  if (ide === "cursor") {
     const state: ExtensionState = { lastKnownMcpClients: [] };
     context.subscriptions.push({
       dispose: () => {
@@ -159,8 +159,6 @@ export async function activate(context: vscode.ExtensionContext) {
     await monitorMcpState(context, state, config);
   } else if (ide === "windsurf") {
     await activateWindsurf(context, config);
-  } else {
-    log.warn("Unsupported IDE — neither Cursor MCP API nor Windsurf detected");
   }
 }
 
@@ -188,13 +186,6 @@ export function deactivate() {
     clearTimeout(onDidChangeTimeout);
     onDidChangeTimeout = null;
   }
-}
-
-/**
- * Checks whether the Cursor MCP API is available in the current environment.
- */
-function hasCursorMcpApi(): boolean {
-  return !!(vscode as any).cursor?.mcp?.registerServer;
 }
 
 /**
