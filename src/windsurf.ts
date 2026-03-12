@@ -142,13 +142,23 @@ async function discoverWithRetry(): Promise<LSConnection | null> {
 /**
  * Starts a polling loop that checks the Windsurf LS for MCP server states
  * every 30 seconds. Automatically re-discovers the LS connection on failure
- * to handle LS restarts (new port and CSRF token each time).
+ * to handle LS restarts (new port and CSRF token each time). Stops polling
+ * once the server reaches a terminal state (READY or NEEDS_OAUTH).
  */
 function monitorWindsurfMcpState(
   context: vscode.ExtensionContext,
   config: GleanMdmConfig,
 ) {
   let connection: LSConnection | null = null;
+  let intervalHandle: NodeJS.Timeout | null = null;
+
+  function stopPolling() {
+    if (intervalHandle) {
+      clearInterval(intervalHandle);
+      intervalHandle = null;
+      log.info("Stopped MCP state polling");
+    }
+  }
 
   async function poll() {
     // If no connection, try to discover
@@ -167,7 +177,10 @@ function monitorWindsurfMcpState(
 
     try {
       const states = await getMcpServerStates(connection);
-      handleMcpStateChange(states, config);
+      const done = handleMcpStateChange(states, config);
+      if (done) {
+        stopPolling();
+      }
     } catch (err) {
       log.warn(`MCP state poll failed: ${err}; re-discovering LS`);
       connection = null;
@@ -177,9 +190,9 @@ function monitorWindsurfMcpState(
   // Immediate first check
   void poll();
 
-  const intervalHandle = setInterval(() => void poll(), POLL_INTERVAL_MS);
+  intervalHandle = setInterval(() => void poll(), POLL_INTERVAL_MS);
   context.subscriptions.push({
-    dispose: () => clearInterval(intervalHandle),
+    dispose: () => stopPolling(),
   });
 }
 
@@ -292,8 +305,6 @@ async function getMcpServerStates(
     );
   }
 
-  log.info(`GetMcpServerStates raw response: ${response.data}`);
-
   const parsed = JSON.parse(response.data);
   const states: WindsurfMcpServerState[] = (
     parsed.states ?? []
@@ -316,11 +327,12 @@ async function getMcpServerStates(
  * by matching serverUrl or serverName, then takes action based on status:
  * READY logs success, NEEDS_OAUTH shows a sign-in notification, ERROR logs
  * the error, and PENDING is a no-op. If Glean is not found, re-registers it.
+ * Returns true if polling should stop (terminal state reached).
  */
 function handleMcpStateChange(
   states: WindsurfMcpServerState[],
   config: GleanMdmConfig,
-) {
+): boolean {
   const glean = states.find(
     (s) => s.serverUrl === config.url || s.serverName === config.serverName,
   );
@@ -328,7 +340,7 @@ function handleMcpStateChange(
   if (!glean) {
     log.info("Glean server not found in MCP states; re-registering");
     void registerGleanInConfig(config);
-    return;
+    return false;
   }
 
   log.info(`Glean MCP status: ${glean.status}`);
@@ -337,16 +349,18 @@ function handleMcpStateChange(
     case "MCP_SERVER_STATUS_READY":
       log.info("Glean MCP server is ready");
       signInNotificationVisible = false;
-      break;
+      return true;
     case "MCP_SERVER_STATUS_NEEDS_OAUTH":
       showSignInNotification();
-      break;
+      return true;
     case "MCP_SERVER_STATUS_ERROR":
       log.error(`Glean MCP server error for "${glean.serverName}"`);
-      break;
+      return false;
     case "MCP_SERVER_STATUS_PENDING":
-      // Still connecting, no-op
-      break;
+      // Still connecting, keep polling
+      return false;
+    default:
+      return false;
   }
 }
 
