@@ -7,13 +7,10 @@ import { promisify } from "util";
 import * as vscode from "vscode";
 
 import * as log from "./log";
+import { signInButton, signInMessage } from "./shared";
 import type { GleanMdmConfig } from "./types";
 
 const execFileAsync = promisify(execFile);
-
-const signInMessage =
-  "Search your company's knowledge without leaving your editor. Find docs, examples, and answers right where you work.";
-const signInButton = "Sign in to Glean";
 
 // --- Types ---
 
