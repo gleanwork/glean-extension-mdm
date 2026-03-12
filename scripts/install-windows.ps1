@@ -1,6 +1,6 @@
 #
 # MDM install script for Windows.
-# Installs the Glean extension into Cursor and deploys the config file.
+# Installs the Glean extension into Cursor and/or Windsurf and deploys the config file.
 #
 # Usage: install-windows.ps1 -GleanMcpUrl <url> [-ServerName <name>]
 #
@@ -60,13 +60,31 @@ function Find-CursorCli {
     return $null
 }
 
-$cursorCmd = Find-CursorCli
-if (-not $cursorCmd) {
-    Write-Error "'cursor' CLI not found in PATH or known install locations."
-    exit 1
-}
+# Locate the Windsurf CLI, checking PATH and well-known install locations.
+function Find-WindsurfCli {
+    # 1. Check PATH
+    $cmd = Get-Command windsurf -ErrorAction SilentlyContinue
+    if ($cmd) {
+        return $cmd.Source
+    }
 
-Write-Host "Found cursor CLI at: $cursorCmd"
+    # 2. Check machine-wide install
+    $machinePath = Join-Path $env:ProgramFiles "Windsurf\resources\app\bin\windsurf.cmd"
+    if (Test-Path $machinePath) {
+        return $machinePath
+    }
+
+    # 3. Check per-user installs across all user profiles
+    $usersDir = Split-Path $env:PUBLIC
+    foreach ($profile in Get-ChildItem $usersDir -Directory -ErrorAction SilentlyContinue) {
+        $userPath = Join-Path $profile.FullName "AppData\Local\Programs\windsurf\resources\app\bin\windsurf.cmd"
+        if (Test-Path $userPath) {
+            return $userPath
+        }
+    }
+
+    return $null
+}
 
 $targetUser = (Get-WmiObject -Class Win32_ComputerSystem).UserName
 if ($targetUser -match '\\') {
@@ -89,11 +107,44 @@ if (-not $targetHome) {
 
 Write-Host "Target user: $targetUser"
 Write-Host "Target home: $targetHome"
-$extDir = Join-Path $targetHome ".cursor\extensions"
-Write-Host "Installing extension as $targetUser..."
-& $cursorCmd --install-extension glean.glean --extensions-dir $extDir
 
-# Ensure the target user owns the installed files
-icacls $extDir /grant "${targetUser}:(OI)(CI)F" /T /Q 2>$null | Out-Null
+$installed = 0
 
-Write-Host "Extension installed successfully."
+# Install into Cursor if available
+$cursorCmd = Find-CursorCli
+if ($cursorCmd) {
+    Write-Host "Found cursor CLI at: $cursorCmd"
+    $extDir = Join-Path $targetHome ".cursor\extensions"
+    Write-Host "Installing Cursor extension as $targetUser..."
+    & $cursorCmd --install-extension glean.glean --extensions-dir $extDir
+
+    # Ensure the target user owns the installed files
+    icacls $extDir /grant "${targetUser}:(OI)(CI)F" /T /Q 2>$null | Out-Null
+
+    Write-Host "Cursor extension installed successfully."
+    $installed = 1
+} else {
+    Write-Host "Cursor CLI not found, skipping Cursor installation."
+}
+
+# Install into Windsurf if available
+$windsurfCmd = Find-WindsurfCli
+if ($windsurfCmd) {
+    Write-Host "Found windsurf CLI at: $windsurfCmd"
+    $extDir = Join-Path $targetHome ".windsurf\extensions"
+    Write-Host "Installing Windsurf extension as $targetUser..."
+    & $windsurfCmd --install-extension glean.glean --extensions-dir $extDir
+
+    # Ensure the target user owns the installed files
+    icacls $extDir /grant "${targetUser}:(OI)(CI)F" /T /Q 2>$null | Out-Null
+
+    Write-Host "Windsurf extension installed successfully."
+    $installed = 1
+} else {
+    Write-Host "Windsurf CLI not found, skipping Windsurf installation."
+}
+
+if ($installed -eq 0) {
+    Write-Error "Neither Cursor nor Windsurf CLI found in PATH or known install locations."
+    exit 1
+}

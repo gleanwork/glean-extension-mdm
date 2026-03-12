@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # MDM install script for Linux.
-# Installs the Glean extension into Cursor and deploys the config file.
+# Installs the Glean extension into Cursor and/or Windsurf and deploys the config file.
 #
 # Usage: install-linux.sh <glean_mcp_url> [server_name]
 #
@@ -59,12 +59,30 @@ find_cursor_cli() {
   return 1
 }
 
-CURSOR_CMD=$(find_cursor_cli) || {
-  echo "Error: 'cursor' CLI not found in PATH or known install locations."
-  exit 1
-}
+# Locate the Windsurf CLI, checking PATH and well-known install locations.
+find_windsurf_cli() {
+  if command -v windsurf &> /dev/null; then
+    echo "windsurf"
+    return
+  fi
 
-echo "Found cursor CLI at: ${CURSOR_CMD}"
+  if [ -x "/usr/local/bin/windsurf" ]; then
+    echo "/usr/local/bin/windsurf"
+    return
+  fi
+
+  if [ -x "/usr/bin/windsurf" ]; then
+    echo "/usr/bin/windsurf"
+    return
+  fi
+
+  if [ -x "/opt/Windsurf/resources/app/bin/windsurf" ]; then
+    echo "/opt/Windsurf/resources/app/bin/windsurf"
+    return
+  fi
+
+  return 1
+}
 
 TARGET_USER="$(logname 2>/dev/null || echo "$USER")"
 
@@ -79,11 +97,43 @@ TARGET_HOME=$(eval echo "~${TARGET_USER}")
 
 echo "Target home: ${TARGET_HOME}"
 
-# Remove any previous installation to avoid ownership conflicts on reinstall
-rm -rf "${TARGET_HOME}/.cursor/extensions/glean.glean-"*
-sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --uninstall-extension glean.glean-mdm 2>/dev/null || true
-sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --uninstall-extension glean.glean 2>/dev/null || true
+INSTALLED=0
 
-echo "Installing extension as ${TARGET_USER}..."
-sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --install-extension glean.glean
-echo "Extension installed successfully."
+# Install into Cursor if available
+if CURSOR_CMD=$(find_cursor_cli); then
+  echo "Found cursor CLI at: ${CURSOR_CMD}"
+
+  # Remove any previous installation to avoid ownership conflicts on reinstall
+  rm -rf "${TARGET_HOME}/.cursor/extensions/glean.glean-"*
+  sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --uninstall-extension glean.glean-mdm 2>/dev/null || true
+  sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --uninstall-extension glean.glean 2>/dev/null || true
+
+  echo "Installing Cursor extension as ${TARGET_USER}..."
+  sudo -H -u "$TARGET_USER" "$CURSOR_CMD" --install-extension glean.glean
+  echo "Cursor extension installed successfully."
+  INSTALLED=1
+else
+  echo "Cursor CLI not found, skipping Cursor installation."
+fi
+
+# Install into Windsurf if available
+if WINDSURF_CMD=$(find_windsurf_cli); then
+  echo "Found windsurf CLI at: ${WINDSURF_CMD}"
+
+  # Remove any previous installation to avoid ownership conflicts on reinstall
+  rm -rf "${TARGET_HOME}/.windsurf/extensions/glean.glean-"*
+  sudo -H -u "$TARGET_USER" "$WINDSURF_CMD" --uninstall-extension glean.glean-mdm 2>/dev/null || true
+  sudo -H -u "$TARGET_USER" "$WINDSURF_CMD" --uninstall-extension glean.glean 2>/dev/null || true
+
+  echo "Installing Windsurf extension as ${TARGET_USER}..."
+  sudo -H -u "$TARGET_USER" "$WINDSURF_CMD" --install-extension glean.glean
+  echo "Windsurf extension installed successfully."
+  INSTALLED=1
+else
+  echo "Windsurf CLI not found, skipping Windsurf installation."
+fi
+
+if [ "$INSTALLED" -eq 0 ]; then
+  echo "Error: Neither Cursor nor Windsurf CLI found in PATH or known install locations."
+  exit 1
+fi
