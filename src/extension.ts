@@ -134,6 +134,11 @@ export async function activate(context: vscode.ExtensionContext) {
     `Glean version: ${context.extension.packageJSON.version} on ${ide} ${vscode.version}`,
   );
 
+  if (ide === "unknown") {
+    log.info("Not running in Cursor or Windsurf, skipping activation");
+    return;
+  }
+
   const extensionUrl = vscode.workspace
     .getConfiguration("glean")
     .get<string>("mcpServerUrl", "");
