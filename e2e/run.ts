@@ -20,6 +20,48 @@ import {
 const ACTIVATION_TIMEOUT_MS = 60_000;
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 
+/** Map editor names to process search patterns for pkill/pgrep. */
+const EDITOR_PROCESS_PATTERNS: Record<string, string[]> = {
+  cursor: ["Cursor.app", "Cursor Helper"],
+  windsurf: ["Windsurf.app", "Windsurf Helper"],
+  antigravity: ["Antigravity.app", "Antigravity Helper"],
+};
+
+/**
+ * Kill all running processes for an editor to prevent single-instance
+ * IPC interference (where the CLI detects an existing instance and
+ * sends commands to it instead of launching a fresh process).
+ */
+function killEditorProcesses(editorName: string): void {
+  const patterns = EDITOR_PROCESS_PATTERNS[editorName] ?? [editorName];
+  for (const pattern of patterns) {
+    try {
+      execSync(`pkill -9 -f "${pattern}"`, { stdio: "ignore" });
+    } catch {
+      // No matching processes, that's fine
+    }
+  }
+  // Brief pause to let processes fully terminate
+  execSync("sleep 1", { stdio: "ignore" });
+}
+
+/** Log any running processes matching the editor name for diagnostics. */
+function logEditorProcesses(editorName: string): void {
+  try {
+    const result = execSync(
+      `ps aux | grep -i "${editorName}" | grep -v grep | head -20`,
+      { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    if (result.trim()) {
+      console.log(`Running ${editorName} processes:\n${result.trim()}`);
+    } else {
+      console.log(`No running ${editorName} processes found`);
+    }
+  } catch {
+    console.log(`No running ${editorName} processes found`);
+  }
+}
+
 function buildExtension(): void {
   console.log("\n=== Building extension ===");
   execSync("npm run compile", { cwd: PROJECT_ROOT, stdio: "inherit" });
@@ -44,6 +86,10 @@ async function launchEditorAndWait(
   editor: EditorInfo,
   sandbox: ReturnType<typeof createSandbox>,
 ): Promise<{ exitCode: number | null }> {
+  // Kill any existing editor processes to avoid single-instance IPC issues
+  console.log(`Killing existing ${editor.name} processes...`);
+  killEditorProcesses(editor.name);
+
   console.log(`Launching ${editor.name}...`);
 
   const editorStdoutPath = path.join(sandbox.root, "editor-stdout.log");
@@ -67,7 +113,6 @@ async function launchEditorAndWait(
         ...process.env,
         HOME: sandbox.home,
         GLEAN_E2E_LOG_FILE: sandbox.logFile,
-        // Ensure Electron doesn't wait for a keychain password prompt
         ELECTRON_NO_ATTACH_CONSOLE: "1",
       },
       stdio: ["ignore", stdoutFd, stderrFd],
@@ -77,8 +122,13 @@ async function launchEditorAndWait(
   let earlyExit = false;
   child.on("exit", (code) => {
     earlyExit = true;
-    console.log(`${editor.name}: Process exited early with code ${code}`);
+    console.log(`${editor.name}: CLI process exited with code ${code}`);
   });
+
+  // The CLI binary exits immediately after spawning the Electron app.
+  // Wait a moment then check if the Electron process is actually running.
+  await new Promise((resolve) => setTimeout(resolve, 3_000));
+  logEditorProcesses(editor.name);
 
   // Wait for the activation log line or timeout
   const activated = await waitForLogLine(
@@ -122,18 +172,19 @@ async function launchEditorAndWait(
   fs.closeSync(stdoutFd);
   fs.closeSync(stderrFd);
 
-  // Kill the editor process if it hasn't exited already
+  // Kill the editor — both the CLI child and any Electron processes it spawned
   if (!earlyExit) {
     child.kill("SIGTERM");
     await new Promise<void>((resolve) => {
       child.on("exit", () => resolve());
-      // Force kill after 5s if it doesn't exit gracefully
       setTimeout(() => {
         child.kill("SIGKILL");
         resolve();
       }, 5_000);
     });
   }
+  // Always kill spawned Electron processes (CLI exits early but Electron keeps running)
+  killEditorProcesses(editor.name);
 
   return { exitCode: child.exitCode };
 }
