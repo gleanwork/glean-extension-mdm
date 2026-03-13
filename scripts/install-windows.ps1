@@ -1,6 +1,6 @@
 #
 # MDM install script for Windows.
-# Installs the Glean extension into Cursor and/or Windsurf and deploys the config file.
+# Installs the Glean extension into Cursor, Windsurf, and/or Antigravity and deploys the config file.
 #
 # Usage: install-windows.ps1 -GleanMcpUrl <url> [-ServerName <name>]
 #
@@ -86,6 +86,32 @@ function Find-WindsurfCli {
     return $null
 }
 
+# Locate the Antigravity CLI, checking PATH and well-known install locations.
+function Find-AntigravityCli {
+    # 1. Check PATH
+    $cmd = Get-Command antigravity -ErrorAction SilentlyContinue
+    if ($cmd) {
+        return $cmd.Source
+    }
+
+    # 2. Check machine-wide install
+    $machinePath = Join-Path $env:ProgramFiles "Antigravity\resources\app\bin\antigravity.cmd"
+    if (Test-Path $machinePath) {
+        return $machinePath
+    }
+
+    # 3. Check per-user installs across all user profiles
+    $usersDir = Split-Path $env:PUBLIC
+    foreach ($profile in Get-ChildItem $usersDir -Directory -ErrorAction SilentlyContinue) {
+        $userPath = Join-Path $profile.FullName "AppData\Local\Programs\antigravity\resources\app\bin\antigravity.cmd"
+        if (Test-Path $userPath) {
+            return $userPath
+        }
+    }
+
+    return $null
+}
+
 $targetUser = (Get-WmiObject -Class Win32_ComputerSystem).UserName
 if ($targetUser -match '\\') {
     $targetUser = $targetUser.Split('\')[-1]
@@ -144,7 +170,24 @@ if ($windsurfCmd) {
     Write-Host "Windsurf CLI not found, skipping Windsurf installation."
 }
 
+# Install into Antigravity if available
+$antigravityCmd = Find-AntigravityCli
+if ($antigravityCmd) {
+    Write-Host "Found antigravity CLI at: $antigravityCmd"
+    $extDir = Join-Path $targetHome ".antigravity\extensions"
+    Write-Host "Installing Antigravity extension as $targetUser..."
+    & $antigravityCmd --install-extension glean.glean --extensions-dir $extDir
+
+    # Ensure the target user owns the installed files
+    icacls $extDir /grant "${targetUser}:(OI)(CI)F" /T /Q 2>$null | Out-Null
+
+    Write-Host "Antigravity extension installed successfully."
+    $installed = 1
+} else {
+    Write-Host "Antigravity CLI not found, skipping Antigravity installation."
+}
+
 if ($installed -eq 0) {
-    Write-Error "Neither Cursor nor Windsurf CLI found in PATH or known install locations."
+    Write-Error "No supported editor CLI (Cursor, Windsurf, Antigravity) found in PATH or known install locations."
     exit 1
 }
