@@ -1,0 +1,42 @@
+name: E2E Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      editors:
+        description: 'Editors to test (comma-separated: cursor,windsurf,antigravity)'
+        default: 'cursor,windsurf,antigravity'
+  push:
+    tags: ['v*']
+
+jobs:
+  e2e:
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install editor binaries
+        run: bash e2e/install-editors.sh
+
+      - run: npm ci
+      - run: npm run compile
+      - run: npm run package
+
+      - name: Run E2E tests
+        run: npx tsx e2e/run.ts
+        env:
+          GLEAN_E2E_EDITORS: ${{ github.event.inputs.editors || 'cursor,windsurf,antigravity' }}
+          GLEAN_E2E_SKIP_BUILD: 'true'
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: /tmp/glean-e2e-*/

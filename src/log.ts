@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as vscode from "vscode";
 import * as util from "util";
 
@@ -24,7 +25,13 @@ function formatArgs(args: unknown[]): string {
 function write(level: string, args: unknown[]) {
   const timestamp = new Date().toISOString();
   const message = formatArgs(args);
-  getChannel().appendLine(`${timestamp} [${level}] ${message}`);
+  const formatted = `${timestamp} [${level}] ${message}`;
+  getChannel().appendLine(formatted);
+
+  const logFilePath = process.env.GLEAN_E2E_LOG_FILE;
+  if (logFilePath) {
+    fs.appendFileSync(logFilePath, formatted + "\n");
+  }
 }
 
 export function info(...args: unknown[]) {
