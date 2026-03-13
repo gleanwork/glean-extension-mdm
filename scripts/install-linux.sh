@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # MDM install script for Linux.
-# Installs the Glean extension into Cursor and/or Windsurf and deploys the config file.
+# Installs the Glean extension into Cursor, Windsurf, and/or Antigravity and deploys the config file.
 #
 # Usage: install-linux.sh <glean_mcp_url> [server_name]
 #
@@ -84,6 +84,31 @@ find_windsurf_cli() {
   return 1
 }
 
+# Locate the Antigravity CLI, checking PATH and well-known install locations.
+find_antigravity_cli() {
+  if command -v antigravity &> /dev/null; then
+    echo "antigravity"
+    return
+  fi
+
+  if [ -x "/usr/local/bin/antigravity" ]; then
+    echo "/usr/local/bin/antigravity"
+    return
+  fi
+
+  if [ -x "/usr/bin/antigravity" ]; then
+    echo "/usr/bin/antigravity"
+    return
+  fi
+
+  if [ -x "/opt/Antigravity/resources/app/bin/antigravity" ]; then
+    echo "/opt/Antigravity/resources/app/bin/antigravity"
+    return
+  fi
+
+  return 1
+}
+
 TARGET_USER="$(logname 2>/dev/null || echo "$USER")"
 
 echo "Target user: ${TARGET_USER}"
@@ -133,7 +158,24 @@ else
   echo "Windsurf CLI not found, skipping Windsurf installation."
 fi
 
+# Install into Antigravity if available
+if ANTIGRAVITY_CMD=$(find_antigravity_cli); then
+  echo "Found antigravity CLI at: ${ANTIGRAVITY_CMD}"
+
+  # Remove any previous installation to avoid ownership conflicts on reinstall
+  rm -rf "${TARGET_HOME}/.antigravity/extensions/glean.glean-"*
+  sudo -H -u "$TARGET_USER" "$ANTIGRAVITY_CMD" --uninstall-extension glean.glean-mdm 2>/dev/null || true
+  sudo -H -u "$TARGET_USER" "$ANTIGRAVITY_CMD" --uninstall-extension glean.glean 2>/dev/null || true
+
+  echo "Installing Antigravity extension as ${TARGET_USER}..."
+  sudo -H -u "$TARGET_USER" "$ANTIGRAVITY_CMD" --install-extension glean.glean
+  echo "Antigravity extension installed successfully."
+  INSTALLED=1
+else
+  echo "Antigravity CLI not found, skipping Antigravity installation."
+fi
+
 if [ "$INSTALLED" -eq 0 ]; then
-  echo "Error: Neither Cursor nor Windsurf CLI found in PATH or known install locations."
+  echo "Error: No supported editor CLI (Cursor, Windsurf, Antigravity) found in PATH or known install locations."
   exit 1
 fi
