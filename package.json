@@ -37,12 +37,15 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "package": "vsce package --out glean.vsix",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "tsx e2e/run.ts",
+    "test:smoke": "bash e2e/smoke-test.sh"
   },
   "devDependencies": {
     "@types/node": "^22",
     "@types/vscode": "^1.93.0",
     "@vscode/vsce": "^3.2.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0",
     "vitest": "^4.0.18"
   }
