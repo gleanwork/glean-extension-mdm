@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
 
-import { activateAntigravity } from "./antigravity";
+import { activateAntigravity } from "./hosts/antigravity";
 import { resolveConfig } from "./config";
-import { activateCursor, deactivateCursor } from "./cursor";
+import { activateCursor, deactivateCursor } from "./hosts/cursor";
 import { detectIde } from "./ide-detect";
 import * as log from "./log";
-import { activateWindsurf } from "./windsurf";
+import { activateWindsurf } from "./hosts/windsurf";
 
 export async function activate(context: vscode.ExtensionContext) {
   // Push log disposable first — LIFO order means it disposes last,

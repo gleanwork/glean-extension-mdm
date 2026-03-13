@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 
-import * as log from "./log";
-import { signInButton, signInMessage } from "./shared";
-import type { GleanMdmConfig } from "./types";
+import * as log from "../log";
+import { signInButton, signInMessage } from "../shared";
+import type { GleanMdmConfig } from "../types";
 
 /**
  * Cursor-specific MCP extension API.
