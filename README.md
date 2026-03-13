@@ -1,6 +1,6 @@
-# Glean
+# Glean OpenVSX Extension
 
-Brings Glean's AI-powered search and knowledge tools directly into Cursor, Windsurf, and VS Code, so you can find company information without leaving your editor.
+Brings Glean's AI-powered search and knowledge tools directly into Cursor, Windsurf, and Antigravity, so you can find company information without leaving your editor.
 
 ## Configuration
 
@@ -20,10 +20,6 @@ Config files use the following format:
 ```json
 {
   "serverName": "glean-default",
-  "url": "https://your-instance.glean.com/mcp/sse"
+  "url": "https://your-instance.glean.com/mcp/default"
 }
 ```
-
-## Authentication
-
-Sign in to Glean when you first launch your editor. After that, you will be automatically connected to Glean's MCP server.
