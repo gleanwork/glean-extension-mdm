@@ -6,32 +6,32 @@ import * as path from "path";
 import { promisify } from "util";
 import * as vscode from "vscode";
 
-import * as log from "./log";
-import { signInButton, signInMessage } from "./shared";
-import type { GleanMdmConfig } from "./types";
+import * as log from "../log";
+import { signInButton, signInMessage } from "../shared";
+import type { GleanMdmConfig } from "../types";
 
 const execFileAsync = promisify(execFile);
 
 // --- Types ---
 
-type AntigravityMcpConfig = {
+type WindsurfMcpConfig = {
   mcpServers: Record<
     string,
     { serverUrl: string; headers?: Record<string, string> }
   >;
 };
 
-type AntigravityMcpStatus =
+type WindsurfMcpStatus =
   | "MCP_SERVER_STATUS_UNSPECIFIED"
   | "MCP_SERVER_STATUS_PENDING"
   | "MCP_SERVER_STATUS_READY"
   | "MCP_SERVER_STATUS_ERROR"
   | "MCP_SERVER_STATUS_NEEDS_OAUTH";
 
-type AntigravityMcpServerState = {
+type WindsurfMcpServerState = {
   serverName: string;
   serverUrl: string;
-  status: AntigravityMcpStatus;
+  status: WindsurfMcpStatus;
 };
 
 type LSConnection = {
@@ -44,36 +44,36 @@ type LSConnection = {
 let signInNotificationVisible = false;
 
 /**
- * Entry point for Antigravity MCP integration. Ensures Glean is registered
- * in the Antigravity MCP config file and starts polling the language server
+ * Entry point for Windsurf MCP integration. Ensures Glean is registered
+ * in the Windsurf MCP config file and starts polling the language server
  * for MCP state changes.
  */
-export async function activateAntigravity(
+export async function activateWindsurf(
   context: vscode.ExtensionContext,
   config: GleanMdmConfig,
 ) {
   await registerGleanInConfig(config);
-  monitorAntigravityMcpState(context, config);
+  monitorWindsurfMcpState(context, config);
 }
 
-/** Returns the path to Antigravity's MCP config file. */
+/** Returns the path to Windsurf's MCP config file. */
 function getMcpConfigPath(): string {
-  return path.join(os.homedir(), ".gemini", "antigravity", "mcp_config.json");
+  return path.join(os.homedir(), ".codeium", "windsurf", "mcp_config.json");
 }
 
 /**
- * Ensures Glean is registered in `~/.gemini/antigravity/mcp_config.json`.
+ * Ensures Glean is registered in `~/.codeium/windsurf/mcp_config.json`.
  * Reads the existing config (or creates a new one), checks for an existing
- * entry with the same serverUrl to avoid duplicates, and writes the entry
- * if missing. The LS auto-detects config file changes.
+ * entry with the same serverUrl to avoid duplicates, writes the entry if
+ * missing, and calls `windsurf.refreshMcpServers` to reload.
  */
 async function registerGleanInConfig(config: GleanMdmConfig): Promise<void> {
   const configPath = getMcpConfigPath();
-  let data: AntigravityMcpConfig;
+  let data: WindsurfMcpConfig;
 
   try {
     const content = await fs.readFile(configPath, "utf-8");
-    data = JSON.parse(content) as AntigravityMcpConfig;
+    data = JSON.parse(content) as WindsurfMcpConfig;
     if (!data.mcpServers || typeof data.mcpServers !== "object") {
       data.mcpServers = {};
     }
@@ -88,7 +88,7 @@ async function registerGleanInConfig(config: GleanMdmConfig): Promise<void> {
 
   if (existingEntry) {
     log.info(
-      `Glean already configured in Antigravity config under key "${existingEntry[0]}", skipping write`,
+      `Glean already configured in Windsurf config under key "${existingEntry[0]}", skipping write`,
     );
     return;
   }
@@ -102,15 +102,22 @@ async function registerGleanInConfig(config: GleanMdmConfig): Promise<void> {
   await fs.mkdir(path.dirname(configPath), { recursive: true });
   await fs.writeFile(configPath, JSON.stringify(data, null, 2), "utf-8");
   log.info(`Wrote Glean MCP config to ${configPath}`);
+
+  try {
+    await vscode.commands.executeCommand("windsurf.refreshMcpServers");
+    log.info("Called windsurf.refreshMcpServers");
+  } catch (err) {
+    log.warn(`Failed to call windsurf.refreshMcpServers: ${err}`);
+  }
 }
 
 const POLL_INTERVAL_MS = 30_000;
 const DISCOVERY_RETRY_DELAYS_MS = [0, 2_000, 4_000, 8_000, 16_000];
 
 /**
- * Attempts to discover the Antigravity language server with exponential
- * backoff retries (0s, 2s, 4s, 8s, 16s) to handle the startup race where
- * the LS may not be running yet when the extension activates.
+ * Attempts to discover the Windsurf language server with exponential backoff
+ * retries (0s, 2s, 4s, 8s, 16s) to handle the startup race where the LS
+ * may not be running yet when the extension activates.
  */
 async function discoverWithRetry(): Promise<LSConnection | null> {
   for (let i = 0; i < DISCOVERY_RETRY_DELAYS_MS.length; i++) {
@@ -130,12 +137,12 @@ async function discoverWithRetry(): Promise<LSConnection | null> {
 }
 
 /**
- * Starts a polling loop that checks the Antigravity LS for MCP server states
+ * Starts a polling loop that checks the Windsurf LS for MCP server states
  * every 30 seconds. Automatically re-discovers the LS connection on failure
  * to handle LS restarts (new port and CSRF token each time). Stops polling
  * once the server reaches a terminal state (READY or NEEDS_OAUTH).
  */
-function monitorAntigravityMcpState(
+function monitorWindsurfMcpState(
   context: vscode.ExtensionContext,
   config: GleanMdmConfig,
 ) {
@@ -156,18 +163,18 @@ function monitorAntigravityMcpState(
       connection = await discoverWithRetry();
       if (!connection) {
         log.info(
-          "Could not discover Antigravity language server; will retry next poll",
+          "Could not discover Windsurf language server; will retry next poll",
         );
         return;
       }
       log.info(
-        `Discovered Antigravity LS at port ${connection.port}`,
+        `Discovered Windsurf LS at port ${connection.port}`,
       );
     }
 
     try {
       const states = await getMcpServerStates(connection);
-      const done = handleMcpStateChange(states, config, connection);
+      const done = handleMcpStateChange(states, config);
       if (done) {
         stopPolling();
       }
@@ -187,111 +194,106 @@ function monitorAntigravityMcpState(
 }
 
 /**
- * Discovers the Antigravity language server connection details on macOS.
- * Calls `antigravity.getDiagnostics` to parse the HTTP port and PID from
- * LS logs, then extracts the `--csrf_token` CLI arg via `ps -o args`.
+ * Discovers the Windsurf language server connection details on macOS.
+ * Finds the LS process via `pgrep`, extracts the CSRF token from the
+ * process environment via `ps eww`, and discovers the listening port
+ * via `lsof`.
  */
 async function discoverLanguageServer(): Promise<LSConnection | null> {
   try {
-    // Step 1: Parse LS info from getDiagnostics
-    const diag = await vscode.commands.executeCommand<string>(
-      "antigravity.getDiagnostics",
-    );
-    if (typeof diag !== "string") {
-      return null;
-    }
-
-    let httpPort: number | undefined;
-    let lsPid: string | undefined;
-
-    const parsed = JSON.parse(diag);
-    const lsLogs: string[] = parsed?.languageServerLogs?.logs ?? [];
-    for (const line of lsLogs) {
-      const httpMatch = line.match(
-        /listening on random port at (\d+) for HTTP\b/,
-      );
-      if (httpMatch) {
-        httpPort = parseInt(httpMatch[1], 10);
-      }
-      const pidMatch = line.match(
-        /Starting language server process with pid (\d+)/,
-      );
-      if (pidMatch) {
-        lsPid = pidMatch[1];
-      }
-    }
-
-    if (!httpPort || !lsPid) {
-      return null;
-    }
-
-    // Step 2: Extract CSRF token from process command line args
-    const { stdout: psArgs } = await execFileAsync("ps", [
-      "-o",
-      "args",
-      "-p",
-      lsPid,
+    // Find PID
+    const { stdout: pgrepOut } = await execFileAsync("pgrep", [
+      "-f",
+      "language_server_macos_arm",
     ]);
-    const csrfMatch = psArgs.match(/--csrf_token\s+(\S+)/);
+    const pid = pgrepOut.trim().split("\n")[0];
+    if (!pid) {
+      return null;
+    }
+
+    // Extract CSRF token from process environment
+    const { stdout: psOut } = await execFileAsync("ps", [
+      "eww",
+      "-o",
+      "command",
+      "-p",
+      pid,
+    ]);
+    const csrfMatch = psOut.match(/WINDSURF_CSRF_TOKEN=(\S+)/);
     if (!csrfMatch) {
-      log.warn("--csrf_token not found in LS process args");
+      log.warn("WINDSURF_CSRF_TOKEN not found in LS process environment");
       return null;
     }
     const csrfToken = csrfMatch[1];
 
-    return { port: httpPort, csrfToken };
+    // Discover port via lsof
+    const { stdout: lsofOut } = await execFileAsync("lsof", [
+      "-a",
+      "-iTCP",
+      "-sTCP:LISTEN",
+      "-P",
+      "-n",
+      "-p",
+      pid,
+    ]);
+
+    let port: number | undefined;
+    for (const line of lsofOut.split("\n")) {
+      if (!line.startsWith("language_")) {
+        continue;
+      }
+      const portMatch = line.match(/:(\d+)\s+\(LISTEN\)/);
+      if (portMatch) {
+        port = parseInt(portMatch[1], 10);
+        break;
+      }
+    }
+
+    if (!port) {
+      log.warn("Could not discover LS port from lsof output");
+      return null;
+    }
+
+    return { port, csrfToken };
   } catch {
     return null;
   }
 }
 
 /**
- * Makes an HTTP POST request to the Antigravity language server with
- * CSRF and Accept headers.
- */
-function httpPost(
-  conn: LSConnection,
-  reqPath: string,
-  body: string,
-): Promise<{ status: number; data: string }> {
-  return new Promise((resolve, reject) => {
-    const req = http.request(
-      {
-        hostname: "127.0.0.1",
-        port: conn.port,
-        path: reqPath,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json, text/event-stream",
-          "x-codeium-csrf-token": conn.csrfToken,
-        },
-      },
-      (res) => {
-        let data = "";
-        res.on("data", (chunk: Buffer) => (data += chunk.toString()));
-        res.on("end", () =>
-          resolve({ status: res.statusCode ?? 0, data }),
-        );
-      },
-    );
-    req.on("error", reject);
-    req.write(body);
-    req.end();
-  });
-}
-
-/**
- * Calls the Antigravity language server's ConnectRPC endpoint to retrieve
+ * Calls the Windsurf language server's ConnectRPC endpoint to retrieve
  * the current state of all registered MCP servers.
  */
 async function getMcpServerStates(
   conn: LSConnection,
-): Promise<AntigravityMcpServerState[]> {
-  const response = await httpPost(
-    conn,
-    "/exa.language_server_pb.LanguageServerService/GetMcpServerStates",
-    JSON.stringify({}),
+): Promise<WindsurfMcpServerState[]> {
+  const body = JSON.stringify({});
+
+  const response = await new Promise<{ status: number; data: string }>(
+    (resolve, reject) => {
+      const req = http.request(
+        {
+          hostname: "127.0.0.1",
+          port: conn.port,
+          path: "/exa.language_server_pb.LanguageServerService/GetMcpServerStates",
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-codeium-csrf-token": conn.csrfToken,
+          },
+        },
+        (res) => {
+          let data = "";
+          res.on("data", (chunk: Buffer) => (data += chunk.toString()));
+          res.on("end", () =>
+            resolve({ status: res.statusCode ?? 0, data }),
+          );
+        },
+      );
+      req.on("error", reject);
+      req.write(body);
+      req.end();
+    },
   );
 
   if (response.status !== 200) {
@@ -301,7 +303,7 @@ async function getMcpServerStates(
   }
 
   const parsed = JSON.parse(response.data);
-  const states: AntigravityMcpServerState[] = (
+  const states: WindsurfMcpServerState[] = (
     parsed.states ?? []
   ).map(
     (s: {
@@ -310,7 +312,7 @@ async function getMcpServerStates(
     }) => ({
       serverName: s.spec?.serverName ?? "",
       serverUrl: s.spec?.serverUrl ?? "",
-      status: (s.status ?? "MCP_SERVER_STATUS_UNSPECIFIED") as AntigravityMcpStatus,
+      status: (s.status ?? "MCP_SERVER_STATUS_UNSPECIFIED") as WindsurfMcpStatus,
     }),
   );
 
@@ -325,9 +327,8 @@ async function getMcpServerStates(
  * Returns true if polling should stop (terminal state reached).
  */
 function handleMcpStateChange(
-  states: AntigravityMcpServerState[],
+  states: WindsurfMcpServerState[],
   config: GleanMdmConfig,
-  conn: LSConnection,
 ): boolean {
   const glean = states.find(
     (s) => s.serverUrl === config.url || s.serverName === config.serverName,
@@ -347,7 +348,7 @@ function handleMcpStateChange(
       signInNotificationVisible = false;
       return true;
     case "MCP_SERVER_STATUS_NEEDS_OAUTH":
-      showSignInNotification(conn);
+      showSignInNotification();
       return true;
     case "MCP_SERVER_STATUS_ERROR":
       log.error(`Glean MCP server error for "${glean.serverName}"`);
@@ -363,10 +364,10 @@ function handleMcpStateChange(
 /**
  * Shows a warning notification prompting the user to sign in to Glean.
  * Uses a de-dup flag to prevent stacking multiple notifications.
- * Clicking "Sign in to Glean" calls the RefreshMcpServers LS endpoint
+ * Clicking "Sign in to Glean" triggers `windsurf.refreshMcpServers`
  * which initiates the OAuth flow in the language server.
  */
-function showSignInNotification(conn: LSConnection) {
+function showSignInNotification() {
   if (signInNotificationVisible) {
     return;
   }
@@ -379,30 +380,7 @@ function showSignInNotification(conn: LSConnection) {
       signInNotificationVisible = false;
       if (action === signInButton) {
         log.info("Sign in button clicked — refreshing MCP servers");
-        void refreshMcpServers(conn);
+        vscode.commands.executeCommand("windsurf.refreshMcpServers");
       }
     });
-}
-
-/**
- * Calls the Antigravity language server's RefreshMcpServers endpoint
- * to trigger an MCP server refresh (e.g., to initiate OAuth flow).
- */
-async function refreshMcpServers(conn: LSConnection): Promise<void> {
-  try {
-    const response = await httpPost(
-      conn,
-      "/exa.language_server_pb.LanguageServerService/RefreshMcpServers",
-      JSON.stringify({}),
-    );
-    if (response.status === 200) {
-      log.info("Called RefreshMcpServers on LS");
-    } else {
-      log.warn(
-        `RefreshMcpServers returned HTTP ${response.status}: ${response.data}`,
-      );
-    }
-  } catch (err) {
-    log.warn(`Failed to call RefreshMcpServers: ${err}`);
-  }
 }
