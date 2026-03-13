@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 
+import { activateAntigravity } from "./antigravity";
 import { resolveConfig } from "./config";
 import { activateCursor, deactivateCursor } from "./cursor";
 import { detectIde } from "./ide-detect";
@@ -17,7 +18,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   if (ide === "unknown") {
-    log.info("Not running in Cursor or Windsurf, skipping activation");
+    log.info("Not running in Cursor, Windsurf, or Antigravity, skipping activation");
     return;
   }
 
@@ -35,6 +36,8 @@ export async function activate(context: vscode.ExtensionContext) {
     await activateCursor(context, config);
   } else if (ide === "windsurf") {
     await activateWindsurf(context, config);
+  } else if (ide === "antigravity") {
+    await activateAntigravity(context, config);
   }
 }
 
