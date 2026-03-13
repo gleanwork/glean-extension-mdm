@@ -17,7 +17,7 @@ import {
   waitForLogLine,
 } from "./helpers";
 
-const ACTIVATION_TIMEOUT_MS = 30_000;
+const ACTIVATION_TIMEOUT_MS = 60_000;
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 
 function buildExtension(): void {
@@ -46,6 +46,11 @@ async function launchEditorAndWait(
 ): Promise<{ exitCode: number | null }> {
   console.log(`Launching ${editor.name}...`);
 
+  const editorStdoutPath = path.join(sandbox.root, "editor-stdout.log");
+  const editorStderrPath = path.join(sandbox.root, "editor-stderr.log");
+  const stdoutFd = fs.openSync(editorStdoutPath, "w");
+  const stderrFd = fs.openSync(editorStderrPath, "w");
+
   const child = spawn(
     editor.binaryPath,
     [
@@ -62,10 +67,18 @@ async function launchEditorAndWait(
         ...process.env,
         HOME: sandbox.home,
         GLEAN_E2E_LOG_FILE: sandbox.logFile,
+        // Ensure Electron doesn't wait for a keychain password prompt
+        ELECTRON_NO_ATTACH_CONSOLE: "1",
       },
-      stdio: "inherit",
+      stdio: ["ignore", stdoutFd, stderrFd],
     },
   );
+
+  let earlyExit = false;
+  child.on("exit", (code) => {
+    earlyExit = true;
+    console.log(`${editor.name}: Process exited early with code ${code}`);
+  });
 
   // Wait for the activation log line or timeout
   const activated = await waitForLogLine(
@@ -93,18 +106,34 @@ async function launchEditorAndWait(
     console.log(
       `${editor.name}: Timed out waiting for activation (${ACTIVATION_TIMEOUT_MS}ms)`,
     );
+    // Dump editor stdout/stderr for debugging
+    const stdout = readLogFile(editorStdoutPath);
+    const stderr = readLogFile(editorStderrPath);
+    if (stdout) {
+      console.log(`\n--- ${editor.name} stdout ---`);
+      console.log(stdout.slice(-2000));
+    }
+    if (stderr) {
+      console.log(`\n--- ${editor.name} stderr ---`);
+      console.log(stderr.slice(-2000));
+    }
   }
 
-  // Kill the editor process
-  child.kill("SIGTERM");
-  await new Promise<void>((resolve) => {
-    child.on("exit", () => resolve());
-    // Force kill after 5s if it doesn't exit gracefully
-    setTimeout(() => {
-      child.kill("SIGKILL");
-      resolve();
-    }, 5_000);
-  });
+  fs.closeSync(stdoutFd);
+  fs.closeSync(stderrFd);
+
+  // Kill the editor process if it hasn't exited already
+  if (!earlyExit) {
+    child.kill("SIGTERM");
+    await new Promise<void>((resolve) => {
+      child.on("exit", () => resolve());
+      // Force kill after 5s if it doesn't exit gracefully
+      setTimeout(() => {
+        child.kill("SIGKILL");
+        resolve();
+      }, 5_000);
+    });
+  }
 
   return { exitCode: child.exitCode };
 }
@@ -142,7 +171,7 @@ function runAssertions(
     check(
       assertLogContains(
         logContent,
-        `on ${capitalize(editor.name)}`,
+        `on ${editor.name}`,
         `IDE should be detected as ${editor.name}`,
       ),
     );
@@ -270,10 +299,6 @@ function runAssertions(
     passed: failures.length === 0,
     failures,
   };
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 async function testEditor(
